@@ -1,0 +1,13 @@
+*
+!input/
+!input/*
+!input/code/
+!input/code/*
+input/data/
+input/data/*
+!.bashrc
+!.gitignore
+!.gitmessage
+!args.yaml
+!README.md
+!*.pdf
