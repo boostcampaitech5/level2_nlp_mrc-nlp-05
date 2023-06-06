@@ -14,3 +14,18 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+alias t='python input/code/train.py'
+alias i='python input/code/inference.py'
+alias tn='tmux new -s 0'
+alias tmux_n='tmux new -s 0'
+alias ta='tmux attach -t 0'
+alias tmux_a='tmux attach -t 0'
+alias s='source .bashrc'
+alias c='conda activate mrc'
+alias cl='conda list'
+alias g='git'
+alias gs='git status'
+alias ga='git add .'
+alias gc='git commit'
+alias gcm='git commit -m'
+alias gp='git push origin'
