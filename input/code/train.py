@@ -1,10 +1,8 @@
 import logging
 import os
 import sys
-import yaml
 import wandb
 
-from arguments import Arguments
 from datasets import DatasetDict, load_from_disk
 import evaluate
 from trainer_qa import QuestionAnsweringTrainer
@@ -14,38 +12,57 @@ from transformers import (
     AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
-    HfArgumentParser,
     TrainingArguments,
-    set_seed,
 )
-from utils_qa import check_no_error, postprocess_qa_predictions
+from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
+from omegaconf import OmegaConf
+from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
 
-def main():
-    with open('/opt/ml/args.yaml') as f:
-        args = yaml.safe_load(f)
-    args = Arguments(args)
+
+def main(config):
+    # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
+    # --help flag 를 실행시켜서 확인할 수 도 있습니다.
+
+    model_args, data_args = config.model, config.data
     
+    if config.wandb.use:
+        wandb.init(project=config.wandb.project, name=config.wandb.name)
+    else:
+        wandb.init(should_run=False)
+        
     training_args = TrainingArguments(
-        output_dir=args.train_output_dir,
-        do_train=args.do_train,
-        do_eval=args.do_eval,
-        save_total_limit=args.total_save_model,
-        num_train_epochs=args.max_epoch,
-        learning_rate=args.learning_rate,
-        per_device_train_batch_size=args.batch_size,
-        per_device_eval_batch_size=args.batch_size,
-        warmup_steps=args.warmup_steps,
-        weight_decay=args.weight_decay,
-        evaluation_strategy='steps',
+        output_dir=config.train.train_output_dir,
+        do_train=config.train.do_train,
+        do_eval=config.train.do_eval,
+        do_predict=config.train.do_predict,
+        save_total_limit=3,
+        num_train_epochs=config.train.max_epoch,
+        learning_rate=config.train.learning_rate,
+        per_device_train_batch_size=config.train.batch_size,
+        per_device_eval_batch_size=config.train.batch_size,
+        evaluation_strategy="steps",
+        eval_steps=config.train.eval_step,
+        logging_steps=config.train.logging_step,
+        save_steps=config.train.save_step,
+        warmup_steps=config.train.warmup_steps,
+        weight_decay=config.train.weight_decay,
         load_best_model_at_end=True,
-        report_to='wandb',
         metric_for_best_model='exact_match'
     )
+    
+    if config.wandb.use:
+        training_args.report_to = ["wandb"]
+        
+    print(model_args.model_name_or_path)
 
-    print(f"model is from {args.model_name_or_path}")
-    print(f"data is from {args.train_dataset_name}")
+    # [참고] argument를 manual하게 수정하고 싶은 경우에 아래와 같은 방식을 사용할 수 있습니다
+    # training_args.per_device_train_batch_size = 4
+    # print(training_args.per_device_train_batch_size)
+
+    print(f"model is from {model_args.model_name_or_path}")
+    print(f"data is from {data_args.dataset_name}")
 
     # logging 설정
     logging.basicConfig(
@@ -57,36 +74,34 @@ def main():
     # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
     logger.info("Training/evaluation parameters %s", training_args)
 
-    # 모델을 초기화하기 전에 난수를 고정합니다.
-    set_seed(args.seed)
-
-    datasets = load_from_disk(args.train_dataset_name)
+    datasets = load_from_disk(data_args.dataset_name)
+    print(datasets)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
-        args.config_name
-        if args.config_name is not None
-        else args.model_name_or_path,
+        model_args.config_name
+        if model_args.config_name is not None
+        else model_args.model_name_or_path,
     )
     tokenizer = AutoTokenizer.from_pretrained(
-        args.tokenizer_name
-        if args.tokenizer_name is not None
-        else args.model_name_or_path,
+        model_args.tokenizer_name
+        if model_args.tokenizer_name is not None
+        else model_args.model_name_or_path,
         # 'use_fast' argument를 True로 설정할 경우 rust로 구현된 tokenizer를 사용할 수 있습니다.
         # False로 설정할 경우 python으로 구현된 tokenizer를 사용할 수 있으며,
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
     model = AutoModelForQuestionAnswering.from_pretrained(
-        args.model_name_or_path if args.do_train else args.saved_model_path,
-        # from_tf=bool(".ckpt" in args.model_name_or_path),
-        from_tf=False,
+        model_args.model_name_or_path,
+        from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
     )
 
     print(
         type(training_args),
+        type(model_args),
         type(datasets),
         type(tokenizer),
         type(model),
@@ -94,12 +109,13 @@ def main():
 
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
-        run_mrc(args, training_args, datasets, tokenizer, model)
+        run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
 def run_mrc(
-    args: Arguments,
+    data_args: DictConfig,
     training_args: TrainingArguments,
+    model_args: DictConfig,
     datasets: DatasetDict,
     tokenizer,
     model,
@@ -122,7 +138,7 @@ def run_mrc(
 
     # 오류가 있는지 확인합니다.
     last_checkpoint, max_seq_length = check_no_error(
-        args, training_args, datasets, tokenizer
+        data_args, training_args, datasets, tokenizer
     )
 
     # Train preprocessing / 전처리를 진행합니다.
@@ -134,11 +150,11 @@ def run_mrc(
             examples[context_column_name if pad_on_right else question_column_name],
             truncation="only_second" if pad_on_right else "only_first",
             max_length=max_seq_length,
-            stride=args.doc_stride,
+            stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=True if 'roberta' not in args.model_name_or_path else False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            padding="max_length" if args.pad_to_max_length else False,
+            return_token_type_ids=False if 'roberta' in config.model.model_name_or_path else True, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            padding="max_length" if data_args.pad_to_max_length else False,
         )
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
@@ -156,7 +172,7 @@ def run_mrc(
             cls_index = input_ids.index(tokenizer.cls_token_id)  # cls index
 
             # sequence id를 설정합니다 (to know what is the context and what is the question).
-            sequence_ids = tokenized_examples.sequence_ids(i)
+            sequence_ids = tokenized_examples.sequence_ids(i) # token type id랑 똑같은데, special token에는 None 값이 있음.
 
             # 하나의 example이 여러개의 span을 가질 수 있습니다.
             sample_index = sample_mapping[i]
@@ -168,7 +184,7 @@ def run_mrc(
                 tokenized_examples["end_positions"].append(cls_index)
             else:
                 # text에서 정답의 Start/end character index
-                start_char = answers["answer_start"][0]
+                start_char = answers["answer_start"][0] # 정답은 항상 1개 인가?
                 end_char = start_char + len(answers["text"][0])
 
                 # text에서 current span의 Start token index
@@ -212,9 +228,9 @@ def run_mrc(
         train_dataset = train_dataset.map(
             prepare_train_features,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
+            num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=not args.overwrite_cache,
+            load_from_cache_file=not data_args.overwrite_cache,
         )
 
     # Validation preprocessing
@@ -226,11 +242,11 @@ def run_mrc(
             examples[context_column_name if pad_on_right else question_column_name],
             truncation="only_second" if pad_on_right else "only_first",
             max_length=max_seq_length,
-            stride=args.doc_stride,
+            stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=True if 'roberta' in args.model_name_or_path else False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            padding="max_length" if args.pad_to_max_length else False,
+            return_token_type_ids=False if 'roberta' in config.model.model_name_or_path else True, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            padding="max_length" if data_args.pad_to_max_length else False,
         )
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
@@ -263,9 +279,9 @@ def run_mrc(
         eval_dataset = eval_dataset.map(
             prepare_validation_features,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
+            num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=not args.overwrite_cache,
+            load_from_cache_file=not data_args.overwrite_cache,
         )
 
     # Data collator
@@ -282,7 +298,7 @@ def run_mrc(
             examples=examples,
             features=features,
             predictions=predictions,
-            max_answer_length=args.max_answer_length,
+            max_answer_length=data_args.max_answer_length,
             output_dir=training_args.output_dir,
         )
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
@@ -304,7 +320,11 @@ def run_mrc(
     metric = evaluate.load("squad")
 
     def compute_metrics(p: EvalPrediction):
-        return metric.compute(predictions=p.predictions, references=p.label_ids)
+        metrics = metric.compute(predictions=p.predictions, references=p.label_ids)
+        exact_match = metrics['exact_match']
+        f1 = metrics['f1']
+        
+        return {'eval_exact_match' : exact_match, 'eval_f1' : f1}
 
     # Trainer 초기화
     trainer = QuestionAnsweringTrainer(
@@ -318,18 +338,17 @@ def run_mrc(
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
     )
-    
-    wandb.init(project=args.wandb_project, name=args.wandb_name)
+
 
     # Training
     if training_args.do_train:
         if last_checkpoint is not None:
             checkpoint = last_checkpoint
-        elif os.path.isdir(args.model_name_or_path):
-            checkpoint = args.model_name_or_path
+        elif os.path.isdir(model_args.model_name_or_path):
+            checkpoint = model_args.model_name_or_path
         else:
             checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train() # resume_from_checkpoint=checkpoint
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
@@ -351,8 +370,6 @@ def run_mrc(
         trainer.state.save_to_json(
             os.path.join(training_args.output_dir, "trainer_state.json")
         )
-        
-        wandb.finish()
 
     # Evaluation
     if training_args.do_eval:
@@ -366,4 +383,8 @@ def run_mrc(
 
 
 if __name__ == "__main__":
-    main()
+    config = OmegaConf.load(f'/opt/ml/args.yaml')
+    # 모델을 초기화하기 전에 난수를 고정합니다.
+    set_seed(config.train.seed)   
+     
+    main(config)

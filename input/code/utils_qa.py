@@ -25,7 +25,7 @@ from typing import Any, Optional, Tuple
 
 import numpy as np
 import torch
-from arguments import Arguments
+from omegaconf import DictConfig
 from datasets import DatasetDict
 from tqdm.auto import tqdm
 from transformers import PreTrainedTokenizerFast, TrainingArguments, is_torch_available
@@ -311,7 +311,7 @@ def postprocess_qa_predictions(
 
 
 def check_no_error(
-    args: Arguments,
+    data_args: DictConfig,
     training_args: TrainingArguments,
     datasets: DatasetDict,
     tokenizer,
@@ -344,12 +344,12 @@ def check_no_error(
             "requirement"
         )
 
-    if args.max_seq_length > tokenizer.model_max_length:
+    if data_args.max_seq_length > tokenizer.model_max_length:
         logger.warn(
-            f"The max_seq_length passed ({args.max_seq_length}) is larger than the maximum length for the"
+            f"The max_seq_length passed ({data_args.max_seq_length}) is larger than the maximum length for the"
             f"model ({tokenizer.model_max_length}). Using max_seq_length={tokenizer.model_max_length}."
         )
-    max_seq_length = min(args.max_seq_length, tokenizer.model_max_length)
+    max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
     if "validation" not in datasets:
         raise ValueError("--do_eval requires a validation dataset")
