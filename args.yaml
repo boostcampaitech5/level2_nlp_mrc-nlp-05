@@ -1,11 +1,11 @@
 wandb:
     use: True
-    project: 'mrc_project'
-    name: 'wandb_name'
+    project: mrc_project
+    name: test # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
     
 model:
     model_name: klue/roberta-large
-    saved_model_path: /opt/ml/models/train_dataset/FILE_NAME # inference 때
+    saved_model_path: /opt/ml/models/train_dataset # inference 때
     config_name: null
     tokenizer_name: null
 
@@ -26,12 +26,12 @@ data:
 train:
     batch_size: 16
     max_epoch: 3
-    learning_rate: 5.0e-5
+    learning_rate: 5.0e-6
     eval_step: 200
     logging_step: 200
     save_step: 200
     do_train: True
-    do_eval: True # train에서 True, inference에서 False
+    do_eval: True # train에서 True, eval만 하려면 False. inference에서는 알아서 false로 바꿉니다
     train_output_dir: /opt/ml/models/train_dataset
     inference_output_dir: /opt/ml/outputs/test_dataset
     warmup_steps: 0

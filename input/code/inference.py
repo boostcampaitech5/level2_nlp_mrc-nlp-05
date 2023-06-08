@@ -46,7 +46,7 @@ def main(args):
         output_dir=args.train.inference_output_dir,
         overwrite_output_dir = True,
         do_train=args.train.do_train,
-        do_eval=args.train.do_eval,
+        do_eval=False,
         do_predict=True,
         save_total_limit=3,
         num_train_epochs=args.train.max_epoch,
@@ -201,7 +201,7 @@ def run_mrc(
             stride=data_args.doc_stride,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
-            return_token_type_ids=False, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
+            return_token_type_ids=False if 'roberta' in model_args.model_name else True, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
             padding="max_length" if data_args.pad_to_max_length else False,
         )
 

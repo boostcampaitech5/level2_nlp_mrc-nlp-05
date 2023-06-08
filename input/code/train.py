@@ -17,17 +17,13 @@ from transformers import (
 from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
+from utils.naming import wandb_naming
 
 logger = logging.getLogger(__name__)
 
 
 def main(args):
     model_args, data_args = args.model, args.data
-    
-    if args.wandb.use:
-        wandb.init(project=args.wandb.project, name=args.wandb.name)
-    else:
-        wandb.init(should_run=False)
         
     training_args = TrainingArguments(
         output_dir=args.train.train_output_dir,
@@ -51,7 +47,12 @@ def main(args):
     model_args.model_name_or_path = model_args.model_name if training_args.do_train else model_args.saved_model_path
     
     if args.wandb.use:
+        wandb.init(project=args.wandb.project, name=wandb_naming(
+            args.wandb.name, model_args.model_name, training_args.per_device_train_batch_size, training_args.num_train_epochs, 
+            training_args.learning_rate, training_args.warmup_steps, training_args.weight_decay))
         training_args.report_to = ["wandb"]
+    else:
+        wandb.init(should_run=False)
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.train_dataset_name if training_args.do_train else data_args.test_dataset_name}")
