@@ -14,6 +14,10 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+alias cit='cd /opt/ml/input/code/install' # 1번
+alias cn='conda create -n mrc python=3.10 -y' # 2번
+alias cm='chmod +x install_requirements.sh' # 3번
+alias it='bash ./install_requirements.sh' # 4번
 alias t='python input/code/train.py'
 alias i='python input/code/inference.py'
 alias tn='tmux new -s 0'

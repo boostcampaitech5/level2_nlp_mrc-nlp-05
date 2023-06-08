@@ -36,37 +36,37 @@ from omegaconf import DictConfig
 logger = logging.getLogger(__name__)
 
 
-def main(config):
+def main(args):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
 
-    model_args, data_args = config.model, config.data
+    model_args, data_args = args.model, args.data
     
     training_args = TrainingArguments(
-        output_dir=config.train.inference_output_dir,
+        output_dir=args.train.inference_output_dir,
         overwrite_output_dir = True,
-        do_train=config.train.do_train,
-        do_eval=config.train.do_eval,
-        do_predict=config.train.do_predict,
+        do_train=args.train.do_train,
+        do_eval=args.train.do_eval,
+        do_predict=True,
         save_total_limit=3,
-        num_train_epochs=config.train.max_epoch,
-        learning_rate=config.train.learning_rate,
-        per_device_train_batch_size=config.train.batch_size,
-        per_device_eval_batch_size=config.train.batch_size,
+        num_train_epochs=args.train.max_epoch,
+        learning_rate=args.train.learning_rate,
+        per_device_train_batch_size=args.train.batch_size,
+        per_device_eval_batch_size=args.train.batch_size,
         evaluation_strategy="steps",
-        eval_steps=config.train.eval_step,
-        logging_steps=config.train.logging_step,
-        save_steps=config.train.save_step,
-        warmup_steps=config.train.warmup_steps,
-        weight_decay=config.train.weight_decay,
+        eval_steps=args.train.eval_step,
+        logging_steps=args.train.logging_step,
+        save_steps=args.train.save_step,
+        warmup_steps=args.train.warmup_steps,
+        weight_decay=args.train.weight_decay,
         load_best_model_at_end=True,
         metric_for_best_model='exact_match'
     )
 
     training_args.do_train = True
 
-    print(f"model is from {model_args.model_name_or_path}")
-    print(f"data is from {data_args.dataset_name}")
+    print(f"model is from {model_args.saved_model_path}")
+    print(f"data is from {data_args.test_dataset_name}")
 
     # logging 설정
     logging.basicConfig(
@@ -78,25 +78,24 @@ def main(config):
     # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
     logger.info("Training/evaluation parameters %s", training_args)
 
-    datasets = load_from_disk(data_args.dataset_name)
-    print(datasets)
+    datasets = load_from_disk(data_args.test_dataset_name)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
         model_args.config_name
         if model_args.config_name
-        else model_args.model_name_or_path,
+        else model_args.saved_model_path,
     )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name
-        else model_args.model_name_or_path,
+        else model_args.saved_model_path,
         use_fast=True,
     )
     model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        model_args.saved_model_path,
+        from_tf=bool(".ckpt" in model_args.saved_model_path),
         config=config,
     )
 
@@ -319,8 +318,8 @@ def run_mrc(
 
 
 if __name__ == "__main__":
-    config = OmegaConf.load(f'/opt/ml/args.yaml')
+    args = OmegaConf.load(f'/opt/ml/args.yaml')
     # 모델을 초기화하기 전에 난수를 고정합니다.
-    set_seed(config.train.seed)  
+    set_seed(args.train.seed)  
     
-    main(config)
+    main(args)

@@ -1,38 +1,39 @@
 wandb:
-    use : True
-    project : 'mrc_project'
-    name : 'wandb_name'
+    use: True
+    project: 'mrc_project'
+    name: 'wandb_name'
     
 model:
-    model_name_or_path : klue/roberta-large # train 때는 model명, inference에서는 /opt/ml/models/train_dataset
-    config_name : null
-    tokenizer_name : null
+    model_name: klue/roberta-large
+    saved_model_path: /opt/ml/models/train_dataset/FILE_NAME # inference 때
+    config_name: null
+    tokenizer_name: null
 
 data:
-    dataset_name : /opt/ml/input/data/train_dataset # train에서는 train_datset, inference에서는 test_dataset으로
-    overwrite_cache : False
-    preprocessing_num_workers : null
-    max_seq_length : 384
-    pad_to_max_length : False
-    doc_stride : 128
-    max_answer_length : 30
-    eval_retrieval : True
-    num_clusters : 64
-    top_k_retrieval : 10
-    use_faiss : False
+    train_dataset_name: /opt/ml/input/data/train_dataset
+    test_dataset_name: /opt/ml/input/data/test_dataset
+    overwrite_cache: False
+    preprocessing_num_workers: null
+    max_seq_length: 384
+    pad_to_max_length: False
+    doc_stride: 128
+    max_answer_length: 30
+    eval_retrieval: True
+    num_clusters: 64
+    top_k_retrieval: 10
+    use_faiss: False
 
 train:
-    batch_size : 16
-    max_epoch : 3
-    learning_rate : 5e-5
-    eval_step : 200
-    logging_step : 200
-    save_step : 200
-    do_train : True
-    do_eval : True # train에서 True, inference에서 False
-    do_predict : False # train에서 False, inference에서 True
-    train_output_dir : /opt/ml/models/train_dataset
-    inference_output_dir : /opt/ml/outputs/test_dataset
+    batch_size: 16
+    max_epoch: 3
+    learning_rate: 5.0e-5
+    eval_step: 200
+    logging_step: 200
+    save_step: 200
+    do_train: True
+    do_eval: True # train에서 True, inference에서 False
+    train_output_dir: /opt/ml/models/train_dataset
+    inference_output_dir: /opt/ml/outputs/test_dataset
     warmup_steps: 0
     weight_decay: 0.0
-    seed : 42
+    seed: 42
