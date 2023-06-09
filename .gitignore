@@ -3,6 +3,8 @@
 !input/*
 !input/code/
 !input/code/*
+!input/code/utils/
+!input/code/utils/*
 input/data/
 input/data/*
 !.bashrc
