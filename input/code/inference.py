@@ -19,7 +19,8 @@ from datasets import (
     load_from_disk
 )
 import evaluate
-from retrieval import SparseRetrieval
+from retrieval.retrieval_TFIDF import TFIDFSparseRetrieval
+from retrieval.retrieval_BM25 import BM25SparseRetrieval
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
@@ -46,8 +47,8 @@ def main(args):
         output_dir=args.train.inference_output_dir,
         overwrite_output_dir = True,
         do_train=args.train.do_train,
-        do_eval=False,
-        do_predict=True,
+        do_eval=args.train.do_eval,
+        do_predict=args.train.do_predict,
         save_total_limit=3,
         num_train_epochs=args.train.max_epoch,
         learning_rate=args.train.learning_rate,
@@ -120,9 +121,14 @@ def run_sparse_retrieval(
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    retriever = SparseRetrieval(
+    if data_args.retrieval_type == 'tfidf':
+        retriever = TFIDFSparseRetrieval
+    elif data_args.retrieval_type == 'bm25':
+        retriever = BM25SparseRetrieval
+        
+    retriever = retriever(
         tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    )
+    ) 
     retriever.get_sparse_embedding()
 
     if data_args.use_faiss:
@@ -156,6 +162,7 @@ def run_sparse_retrieval(
                     id=None,
                 ),
                 "context": Value(dtype="string", id=None),
+                "original_context": Value(dtype="string", id=None),
                 "id": Value(dtype="string", id=None),
                 "question": Value(dtype="string", id=None),
             }

@@ -20,7 +20,7 @@ def timer(name):
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
 
-class SparseRetrieval:
+class TFIDFSparseRetrieval:
     def __init__(
         self,
         tokenize_fn,
@@ -383,30 +383,32 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "--dataset_name", metavar="./data/train_dataset", type=str, help=""
+        "--dataset_name", default="/opt/ml/input/data/train_dataset", type=str, help=""
     )
     parser.add_argument(
         "--model_name_or_path",
-        metavar="bert-base-multilingual-cased",
+        default="bert-base-multilingual-cased",
         type=str,
         help="",
     )
-    parser.add_argument("--data_path", metavar="./data", type=str, help="")
+    parser.add_argument("--data_path", default="/opt/ml/input/data", type=str, help="")
     parser.add_argument(
-        "--context_path", metavar="wikipedia_documents", type=str, help=""
+        "--context_path", default="wikipedia_documents.json", type=str, help=""
     )
-    parser.add_argument("--use_faiss", metavar=False, type=bool, help="")
+    parser.add_argument("--use_faiss", default=False, type=bool, help="")
+    parser.add_argument("--top_k_retrieval", default=10, type=int, help="")
 
     args = parser.parse_args()
-
+    
     # Test sparse
     org_dataset = load_from_disk(args.dataset_name)
-    full_ds = concatenate_datasets(
-        [
-            org_dataset["train"].flatten_indices(),
-            org_dataset["validation"].flatten_indices(),
-        ]
-    )  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
+    #full_ds = concatenate_datasets(
+    #    [
+    #        org_dataset["train"].flatten_indices(),
+    #        org_dataset["validation"].flatten_indices(),
+    #    ]
+    #)  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
+    full_ds = org_dataset["validation"]
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
 
@@ -414,7 +416,7 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
 
-    retriever = SparseRetrieval(
+    retriever = TFIDFSparseRetrieval(
         tokenize_fn=tokenizer.tokenize,
         data_path=args.data_path,
         context_path=args.context_path,
@@ -423,6 +425,7 @@ if __name__ == "__main__":
     query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
 
     if args.use_faiss:
+        retriever.get_sparse_embedding()
 
         # test single query
         with timer("single query by faiss"):
@@ -431,14 +434,16 @@ if __name__ == "__main__":
         # test bulk
         with timer("bulk query by exhaustive search"):
             df = retriever.retrieve_faiss(full_ds)
-            df["correct"] = df["original_context"] == df["context"]
-
+            df["correct"] = df.apply(lambda row: row['original_context'] in row['context'], axis=1)
+            
             print("correct retrieval result by faiss", df["correct"].sum() / len(df))
 
     else:
+        retriever.get_sparse_embedding()
         with timer("bulk query by exhaustive search"):
-            df = retriever.retrieve(full_ds)
-            df["correct"] = df["original_context"] == df["context"]
+            df = retriever.retrieve(full_ds, topk=args.top_k_retrieval)
+            df["correct"] = df.apply(lambda row: row['original_context'] in row['context'], axis=1)
+            
             print(
                 "correct retrieval result by exhaustive search",
                 df["correct"].sum() / len(df),

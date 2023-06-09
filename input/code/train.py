@@ -35,6 +35,7 @@ def main(args):
         per_device_train_batch_size=args.train.batch_size,
         per_device_eval_batch_size=args.train.batch_size,
         evaluation_strategy="steps",
+        gradient_accumulation_steps=args.train.gradient_accumulation,
         eval_steps=args.train.eval_step,
         logging_steps=args.train.logging_step,
         save_steps=args.train.save_step,

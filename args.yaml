@@ -5,7 +5,7 @@ wandb:
     
 model:
     model_name: klue/roberta-large
-    saved_model_path: /opt/ml/models/train_dataset # inference 때
+    saved_model_path: /opt/ml/models/train_dataset # inference 때 사용
     config_name: null
     tokenizer_name: null
 
@@ -20,18 +20,21 @@ data:
     max_answer_length: 30
     eval_retrieval: True
     num_clusters: 64
-    top_k_retrieval: 10
+    top_k_retrieval: 20
     use_faiss: False
+    retrieval_type : bm25 # tfidf, bm25
 
 train:
     batch_size: 16
     max_epoch: 3
-    learning_rate: 5.0e-6
+    learning_rate: 5.0e-5
     eval_step: 200
     logging_step: 200
     save_step: 200
+    gradient_accumulation : 1
     do_train: True
-    do_eval: True # train에서 True, eval만 하려면 False. inference에서는 알아서 false로 바꿉니다
+    do_eval: False # train에서 True, 제출용 inference에서는 False, eval inference는 True
+    do_predict : True # train에서 False, 제출용 inference에서는 True, eval inference에서는 False
     train_output_dir: /opt/ml/models/train_dataset
     inference_output_dir: /opt/ml/outputs/test_dataset
     warmup_steps: 0

@@ -5,6 +5,8 @@
 !input/code/*
 !input/code/utils/
 !input/code/utils/*
+!input/code/retrieval/
+!input/code/retrieval/*
 input/data/
 input/data/*
 !.bashrc
