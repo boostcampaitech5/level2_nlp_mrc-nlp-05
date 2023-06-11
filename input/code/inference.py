@@ -94,6 +94,9 @@ def main(args):
         else model_args.saved_model_path,
         use_fast=True,
     )
+    
+    retrieval_tokenizer = AutoTokenizer.from_pretrained(model_args.retrieval_tokenizer)
+    
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.saved_model_path,
         from_tf=bool(".ckpt" in model_args.saved_model_path),
@@ -103,7 +106,7 @@ def main(args):
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
         datasets = run_sparse_retrieval(
-            tokenizer.tokenize, datasets, training_args, data_args,
+            retrieval_tokenizer.tokenize, datasets, training_args, data_args,
         )
 
     # eval or predict mrc model
@@ -186,7 +189,7 @@ def run_mrc(
     question_column_name = "question" if "question" in column_names else column_names[0]
     context_column_name = "context" if "context" in column_names else column_names[1]
     answer_column_name = "answers" if "answers" in column_names else column_names[2]
-
+    
     # Padding에 대한 옵션을 설정합니다.
     # (question|context) 혹은 (context|question)로 세팅 가능합니다.
     pad_on_right = tokenizer.padding_side == "right"
@@ -200,6 +203,7 @@ def run_mrc(
     def prepare_validation_features(examples):
         # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
         # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
+            
         tokenized_examples = tokenizer(
             examples[question_column_name if pad_on_right else context_column_name],
             examples[context_column_name if pad_on_right else question_column_name],
