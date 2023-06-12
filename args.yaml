@@ -8,7 +8,7 @@ model:
     saved_model_path: /opt/ml/models/train_dataset # inference 때 사용
     config_name: null
     tokenizer_name: null
-    retrieval_tokenizer: klue/roberta-large # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
+    retrieval_tokenizer: monologg/koelectra-base-v3-finetuned-korquad # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
 
 data:
     train_dataset_name: /opt/ml/input/data/train_dataset
@@ -18,12 +18,12 @@ data:
     max_seq_length: 384
     pad_to_max_length: False
     doc_stride: 128
-    max_answer_length: 30
+    max_answer_length: 35
     eval_retrieval: True
     num_clusters: 64
-    top_k_retrieval: 30
+    top_k_retrieval: 35
     use_faiss: False
-    retrieval_type : bm25 # tfidf, bm25
+    retrieval_type : tfidf+bm25 # tfidf, bm25, tfidf+bm25
 
 train:
     batch_size: 16
@@ -34,8 +34,8 @@ train:
     save_step: 100
     gradient_accumulation : 1
     do_train: True
-    do_eval: False # train에서 True, 제출용 inference에서는 False, eval inference는 True
-    do_predict : True # train에서 False, 제출용 inference에서는 True, eval inference에서는 False
+    do_eval: True # train에서 True, 제출용 inference에서는 False, eval inference는 True
+    do_predict : False # train에서 False, 제출용 inference에서는 True, eval inference에서는 False
     train_output_dir: /opt/ml/models/train_dataset
     inference_output_dir: /opt/ml/outputs/test_dataset
     warmup_steps: 0

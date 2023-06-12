@@ -21,6 +21,7 @@ from datasets import (
 import evaluate
 from retrieval.retrieval_TFIDF import TFIDFSparseRetrieval
 from retrieval.retrieval_BM25 import BM25SparseRetrieval
+from retrieval.retrieval_reranking import RerankSparseRetrieval
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
@@ -128,6 +129,8 @@ def run_sparse_retrieval(
         retriever = TFIDFSparseRetrieval
     elif data_args.retrieval_type == 'bm25':
         retriever = BM25SparseRetrieval
+    elif data_args.retrieval_type == 'tfidf+bm25':
+        retriever = RerankSparseRetrieval
         
     retriever = retriever(
         tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
@@ -170,6 +173,9 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
+    #datasets2 = load_from_disk('/opt/ml/input/data/train_dataset5')
+    #valid_df = datasets2['validation']
+    #df['question'] = valid_df['question']
     datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
     return datasets
 
