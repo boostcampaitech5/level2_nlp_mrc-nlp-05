@@ -179,7 +179,7 @@ class BM25SparseRetrieval:
                     "question": example["question"],
                     "id": example["id"],
                     # Retrieve한 Passage의 id, context를 반환합니다.
-                    "context": " ".join(
+                    "context": "[SEP]".join(
                         topk_doc[idx]
                     ),
                 }
@@ -285,7 +285,7 @@ class BM25SparseRetrieval:
                     "question": example["question"],
                     "id": example["id"],
                     # Retrieve한 Passage의 id, context를 반환합니다.
-                    "context": " ".join(
+                    "context": "[SEP]".join(
                         [self.contexts[pid] for pid in doc_indices[idx]]
                     ),
                 }
