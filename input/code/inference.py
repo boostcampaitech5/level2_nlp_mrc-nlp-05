@@ -117,7 +117,6 @@ def main(args):
     doc_scores = None
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
-<<<<<<< HEAD
         # konlpy 계열은 morphs, huggingface 계열은 tokenize를 사용하므로 구분
         if model_args.retrieval_tokenizer not in ['mecab', 'hannanum', 'kkma', 'komoran', 'okt']:
             retrieval_tokenizer = AutoTokenizer.from_pretrained(model_args.retrieval_tokenizer)
@@ -136,13 +135,8 @@ def main(args):
             tokenize_fn = retrieval_tokenizer.morphs
         print('retrieval_tokenizer:', retrieval_tokenizer)
         
-        datasets = run_sparse_retrieval(
-            tokenize_fn, datasets, training_args, data_args,
-=======
         datasets, doc_scores = run_sparse_retrieval(
-            retrieval_tokenizer.tokenize, datasets, training_args, data_args,
->>>>>>> 4af4a9aa0b253a3f2f65f7e9b3884fd4796530f0
-        )
+            tokenize_fn, datasets, training_args, data_args)
     
 
     # eval or predict mrc model
@@ -231,7 +225,7 @@ def run_sparse_retrieval(
         return dataset_list, doc_scores
     else:
         datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
-        return [datasets]
+        return [datasets], None
 
 
 def run_mrc(

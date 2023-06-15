@@ -1,7 +1,7 @@
 wandb:
     use: True
     project: mrc_project
-    name: 'korquad_finetuning_2' # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
+    name: 'korquad_finetuning' # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
     
 model:
     model_name: klue/roberta-large
@@ -21,7 +21,7 @@ data:
     max_answer_length: 30
     eval_retrieval: True
     num_clusters: 64
-    top_k_retrieval: 35
+    top_k_retrieval: 30
     use_faiss: False
     data_type: original # original, korquad, korquad_hard, mix, mix_hard (설명은 prepare_dataset.py에)
     split: False # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
@@ -29,8 +29,8 @@ data:
 
 train:
     batch_size: 16
-    max_epoch: 5
-    learning_rate: 8.0e-6
+    max_epoch: 1
+    learning_rate: 3.0e-5
     eval_step: 100
     logging_step: 100
     save_step: 100

@@ -34,6 +34,7 @@ def prepare_dataset(data_type, train_dataset_name, seed):
     elif data_type == 'korquad_hard':
         # korquad_valid까지 train으로 사용
         original_datasets = load_from_disk(train_dataset_name)
+        original_datasets['train'] = original_datasets['train'].remove_columns(['document_id', '__index_level_0__'])
         validation_dataset = original_datasets['validation'].remove_columns(['document_id', '__index_level_0__'])
         
         korquad_datasets = load_dataset("squad_kor_v1", features=original_datasets["train"].features)

@@ -47,9 +47,9 @@ def main(args):
         metric_for_best_model='exact_match'
     )
     
-    # TODO
-    # model_args.model_name_or_path = model_args.model_name if training_args.do_train else model_args.saved_model_path
-    model_args.model_name_or_path = model_args.saved_model_path
+    # finetuning 이후 교체
+    model_args.model_name_or_path = model_args.model_name if training_args.do_train else model_args.saved_model_path
+    # model_args.model_name_or_path = model_args.saved_model_path
     
     if args.wandb.use:
         wandb.init(project=args.wandb.project, name=wandb_naming(

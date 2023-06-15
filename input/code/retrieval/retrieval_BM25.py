@@ -60,7 +60,7 @@ class BM25SparseRetrieval:
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
     
-        self.p_embedding = None  # get_sparse_embedding()로 생성합니다
+        self.bm25 = None  # get_sparse_embedding()로 생성합니다
         self.indexer = None  # build_faiss()로 생성합니다.
 
     def get_sparse_embedding(self) -> None:
@@ -78,16 +78,16 @@ class BM25SparseRetrieval:
 
         if os.path.isfile(emd_path):
             with open(emd_path, "rb") as file:
-                self.p_embedding = pickle.load(file)
+                self.bm25 = pickle.load(file)
             print("Embedding pickle load.")
         else:
             print("Build passage embedding")
             
             tokenized_corpus = [self.tokenizer(doc) for doc in self.contexts]
-            self.p_embedding = BM25Okapi(tokenized_corpus)
+            self.bm25 = BM25Okapi(tokenized_corpus)
             
             with open(emd_path, "wb") as file:
-                pickle.dump(self.p_embedding, file)
+                pickle.dump(self.bm25, file)
             print("Embedding pickle saved.")
 
     def build_faiss(self, num_clusters=64) -> None:
@@ -113,7 +113,7 @@ class BM25SparseRetrieval:
             self.indexer = faiss.read_index(indexer_path)
 
         else:
-            p_emb = self.p_embedding.astype(np.float32).toarray()
+            p_emb = self.bm25.astype(np.float32).toarray()
             emb_dim = p_emb.shape[-1]
 
             num_clusters = num_clusters
@@ -151,7 +151,7 @@ class BM25SparseRetrieval:
                 Ground Truth가 없는 Query (test) -> Retrieval한 Passage만 반환합니다.
         """
 
-        assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
+        assert self.bm25 is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
             doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
