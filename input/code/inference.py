@@ -207,19 +207,10 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             }
         )
-    #if training_args.do_predict:
-    #    datasets2 = load_from_disk('/opt/ml/input/data/test_dataset13')
-    #elif training_args.do_eval:
-    #    datasets2 = load_from_disk('/opt/ml/input/data/train_dataset7')
-
-    #valid_df = datasets2['validation']
-    #df['question'] = valid_df['question']
     
     if data_args.split:
-        datasets2 = load_from_disk('/opt/ml/input/data/test_dataset13') ##
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
-            df_list[i]['question'] = datasets2['validation']['question'] ##
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
             dataset_list.append(dataset)
         return dataset_list, doc_scores
