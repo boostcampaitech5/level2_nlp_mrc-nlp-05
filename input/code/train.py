@@ -3,7 +3,7 @@ import os
 import sys
 import wandb
 
-from datasets import DatasetDict, load_from_disk
+from datasets import DatasetDict
 import evaluate
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
@@ -18,6 +18,7 @@ from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 from utils.naming import wandb_naming
+from prepare_dataset import prepare_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,9 @@ def main(args):
         metric_for_best_model='exact_match'
     )
     
-    model_args.model_name_or_path = model_args.model_name if training_args.do_train else model_args.saved_model_path
+    # TODO
+    # model_args.model_name_or_path = model_args.model_name if training_args.do_train else model_args.saved_model_path
+    model_args.model_name_or_path = model_args.saved_model_path
     
     if args.wandb.use:
         wandb.init(project=args.wandb.project, name=wandb_naming(
@@ -68,8 +71,8 @@ def main(args):
     # verbosity 설정 : Transformers logger의 정보로 사용합니다 (on main process only)
     logger.info("Training/evaluation parameters %s", training_args)
 
-    datasets = load_from_disk(data_args.train_dataset_name if training_args.do_train else data_args.test_dataset_name)
-
+    datasets = prepare_dataset(data_args.data_type, data_args.train_dataset_name, training_args.seed)
+    
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(

@@ -34,6 +34,8 @@ from transformers import (
 from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
+import konlpy.tag as konlpy
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +97,7 @@ def main(args):
         else model_args.saved_model_path,
         use_fast=True,
     )
-    
-    retrieval_tokenizer = AutoTokenizer.from_pretrained(model_args.retrieval_tokenizer)
-    
+        
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.saved_model_path,
         from_tf=bool(".ckpt" in model_args.saved_model_path),
@@ -106,8 +106,26 @@ def main(args):
 
     # True일 경우 : run passage retrieval
     if data_args.eval_retrieval:
+        # konlpy 계열은 morphs, huggingface 계열은 tokenize를 사용하므로 구분
+        if model_args.retrieval_tokenizer not in ['mecab', 'hannanum', 'kkma', 'komoran', 'okt']:
+            retrieval_tokenizer = AutoTokenizer.from_pretrained(model_args.retrieval_tokenizer)
+            tokenize_fn = retrieval_tokenizer.tokenize
+        else:
+            if model_args.retrieval_tokenizer == 'mecab':
+                retrieval_tokenizer = konlpy.Mecab()
+            elif model_args.retrieval_tokenizer == 'hannanum':
+                retrieval_tokenizer = konlpy.Hannanum()
+            elif model_args.retrieval_tokenizer == 'kkma':
+                retrieval_tokenizer = konlpy.Kkma()
+            elif model_args.retrieval_tokenizer == 'komoran':
+                retrieval_tokenizer = konlpy.Komoran()
+            else:
+                retrieval_tokenizer = konlpy.Okt()
+            tokenize_fn = retrieval_tokenizer.morphs
+        print('retrieval_tokenizer:', retrieval_tokenizer)
+        
         datasets = run_sparse_retrieval(
-            retrieval_tokenizer.tokenize, datasets, training_args, data_args,
+            tokenize_fn, datasets, training_args, data_args,
         )
 
     # eval or predict mrc model

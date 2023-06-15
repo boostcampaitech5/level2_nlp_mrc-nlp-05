@@ -15,3 +15,7 @@ input/data/*
 !args.yaml
 !README.md
 !*.pdf
+*.ipynb
+discord_bot.py
+server.py
+client.py
