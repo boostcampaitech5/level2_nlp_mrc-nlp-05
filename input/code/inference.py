@@ -248,6 +248,7 @@ def run_mrc(
         
     for i in range(run):
         # eval 혹은 prediction에서만 사용함
+        print(i, '번째 document inference')
         column_names = datasets[i]["validation"].column_names
 
         question_column_name = "question" if "question" in column_names else column_names[0]
@@ -398,7 +399,7 @@ def run_mrc(
     if data_args.split:
         post_process_voting(doc_scores, args.train.inference_output_dir, data_args.top_k_retrieval, test_df)
         
-        if training_args.do_eval:
+        if not args.train.do_predict:
             predict_path = f'{args.train.inference_output_dir}/predictions.json'
             with open(predict_path, 'r') as json_file:
                 prediction = json.load(json_file)
