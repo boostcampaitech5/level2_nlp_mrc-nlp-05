@@ -5,6 +5,7 @@ import wandb
 
 from datasets import DatasetDict, load_from_disk
 import evaluate
+import argparse
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
@@ -376,7 +377,13 @@ def run_mrc(
 
 
 if __name__ == "__main__":
-    args = OmegaConf.load('/opt/ml/args.yaml')
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument(
+        "--args_path", default=f"/opt/ml/args.yaml", type=str, help=""
+    )
+    arg = parser.parse_args()
+    
+    args = OmegaConf.load(arg.args_path)
     
     set_seed(args.train.seed)
     main(args)
