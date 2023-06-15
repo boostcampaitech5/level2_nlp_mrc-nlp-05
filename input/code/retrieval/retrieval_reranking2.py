@@ -21,7 +21,7 @@ def timer(name):
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
 
-class RerankSparseRetrieval:
+class RerankSparseRetrieval2:
     def __init__(
         self,
         tokenize_fn,
@@ -177,36 +177,7 @@ class RerankSparseRetrieval:
         assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
-            bm25_doc_scores, bm25_doc_indices = self.bm25_get_relevant_doc(query_or_dataset, k=topk)
-            tfidf_doc_scores, tfidf_doc_indices = self.tfidf_get_relevant_doc(query_or_dataset, k=topk)
-            
-            doc_indices = []
-            doc_scores = []
-            
-            for i in tqdm(range(len(bm25_doc_indices)), total=len(bm25_doc_indices)):
-                doc_indice, doc_score = [], []
-                bm25_doc_scores[i] = bm25_doc_scores[i] / np.max(bm25_doc_scores[i])
-                tfidf_doc_scores[i] = tfidf_doc_scores[i] / np.max(tfidf_doc_scores[i])  
-                 
-                for j in range(len(bm25_doc_indices[i])):
-                    if bm25_doc_indices[i][j] == tfidf_doc_indices[i][j]:
-                        doc_score.append((bm25_doc_scores[i][j] + tfidf_doc_scores[i][j])/2)
-                        doc_indice.append(bm25_doc_indices[i][j])
-                    else:
-                        doc_score.append(bm25_doc_scores[i][j])
-                        doc_indice.append(bm25_doc_indices[i][j])
-                        doc_score.append(tfidf_doc_scores[i][j])
-                        doc_indice.append(tfidf_doc_indices[i][j])
-                     
-                doc_score, doc_indice = np.array(doc_score), np.array(doc_indice)
-
-                # doc_scores를 기준으로 내림차순으로 정렬한 인덱스 배열 생성
-                sorted_indices = np.argsort(-doc_score)
-
-                # doc_scores와 doc_indices를 정렬된 인덱스를 기준으로 정렬
-                doc_scores.append(doc_score[sorted_indices][:topk])
-                doc_indices.append(doc_indice[sorted_indices][:topk])
-                
+            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
             print("[Search query]\n", query_or_dataset, "\n")
 
             for i in range(topk):
@@ -218,43 +189,15 @@ class RerankSparseRetrieval:
         elif isinstance(query_or_dataset, Dataset):
 
             # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
+            
             with timer("query exhaustive search"):
-                bm25_doc_scores, bm25_doc_indices = self.bm25_get_relevant_doc_bulk(
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
-                tfidf_doc_scores, tfidf_doc_indices = self.tfidf_get_relevant_doc_bulk(
-                    query_or_dataset["question"], k=topk
-                )
-            
-            doc_indices = []
-            doc_scores = []
-            
-            for i in tqdm(range(len(bm25_doc_indices)), total=len(bm25_doc_indices)):
-                doc_indice, doc_score = [], []
-                bm25_doc_scores[i] = bm25_doc_scores[i] / np.max(bm25_doc_scores[i])
-                tfidf_doc_scores[i] = tfidf_doc_scores[i] / np.max(tfidf_doc_scores[i])  
-                 
-                for j in range(len(bm25_doc_indices[i])):
-                    if bm25_doc_indices[i][j] == tfidf_doc_indices[i][j]:
-                        doc_score.append((bm25_doc_scores[i][j] + tfidf_doc_scores[i][j])/2)
-                        doc_indice.append(bm25_doc_indices[i][j])
-                    else:
-                        doc_score.append(bm25_doc_scores[i][j])
-                        doc_indice.append(bm25_doc_indices[i][j])
-                        doc_score.append(tfidf_doc_scores[i][j])
-                        doc_indice.append(tfidf_doc_indices[i][j])
-                     
-                doc_score, doc_indice = np.array(doc_score), np.array(doc_indice)
-
-                # doc_scores를 기준으로 내림차순으로 정렬한 인덱스 배열 생성
-                sorted_indices = np.argsort(-doc_score)
-
-                # doc_scores와 doc_indices를 정렬된 인덱스를 기준으로 정렬
-                doc_scores.append(doc_score[sorted_indices][:topk])
-                doc_indices.append(doc_indice[sorted_indices][:topk])  
-            
             if split:
-                cqas_lst = [] 
+                doc_scores = doc_scores.toarray()
+                doc_scores = doc_scores / np.max(doc_scores)
+                cqas_lst = []
                 for i in range(topk):
                     total = []
                     for idx, example in enumerate(
@@ -265,7 +208,7 @@ class RerankSparseRetrieval:
                             "question": example["question"],
                             "id": example["id"],
                             # Retrieve한 Passage의 id, context를 반환합니다.
-                            "context": self.contexts[doc_indices[idx][i]],
+                            "context": self.context[doc_indices[idx][i]],
                         }
                         if "context" in example.keys() and "answers" in example.keys():
                             # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
@@ -273,10 +216,10 @@ class RerankSparseRetrieval:
                             tmp["answers"] = example["answers"]
                         total.append(tmp)
                     cqas = pd.DataFrame(total)
-                    cqas_lst.append(cqas)    
+                    cqas_lst.append(cqas)
                 return doc_scores, cqas_lst
             else:
-                total = []        
+                total = []    
                 for idx, example in enumerate(
                     tqdm(query_or_dataset, desc="Sparse retrieval: ")
                 ):
@@ -298,7 +241,7 @@ class RerankSparseRetrieval:
                 cqas = pd.DataFrame(total)
                 return cqas
 
-    def bm25_get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
+    def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
 
         """
         Arguments:
@@ -309,72 +252,33 @@ class RerankSparseRetrieval:
         Note:
             vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
         """
-
-        tokenized_query = [self.tokenizer(query) for query in list(query)]
-        result = np.array([self.bm25.get_scores(query) for query in tokenized_query])
-        doc_scores = []
-        doc_indices = []
-        for scores in tqdm(result, total=len(result)):
-            sorted_result = np.argsort(scores)[-2*k:][::-1]
-            doc_scores.append(scores[sorted_result])
-            doc_indices.append(sorted_result.tolist())
+        query_vec = self.tfidfv.transform(query)
+        tokenized_query = [self.tokenizer(queryy) for queryy in list(query)]
         
-        return doc_scores, doc_indices
-
-    def bm25_get_relevant_doc_bulk(
-        self, queries: List, k: Optional[int] = 1
-    ) -> Tuple[List, List]:
-
-        """
-        Arguments:
-            queries (List):
-                하나의 Query를 받습니다.
-            k (Optional[int]): 1
-                상위 몇 개의 Passage를 반환할지 정합니다.
-        Note:
-            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
-        """
-
-        tokenized_query = [self.tokenizer(query) for query in list(queries)]
-        result = np.array([self.bm25.get_scores(query) for query in tqdm(tokenized_query, total=len(tokenized_query))])
-        doc_scores = []
-        doc_indices = []
-        for scores in tqdm(result, total=len(result)):
-            sorted_result = np.argsort(scores)[-2*k:][::-1]
-            doc_scores.append(scores[sorted_result])
-            doc_indices.append(sorted_result.tolist())
-        
-        return doc_scores, doc_indices
-
-    def tfidf_get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
-
-        """
-        Arguments:
-            query (str):
-                하나의 Query를 받습니다.
-            k (Optional[int]): 1
-                상위 몇 개의 Passage를 반환할지 정합니다.
-        Note:
-            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
-        """
-
-        with timer("transform"):
-            query_vec = self.tfidfv.transform([query])
         assert (
             np.sum(query_vec) != 0
         ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
-
-        with timer("query ex search"):
-            result = query_vec * self.p_embedding.T
-        if not isinstance(result, np.ndarray):
-            result = result.toarray()
-
-        sorted_result = np.argsort(result.squeeze())[::-1]
-        doc_score = result.squeeze()[sorted_result].tolist()[:2*k]
-        doc_indices = sorted_result.tolist()[:2*k]
-        return doc_score, doc_indices
+        
+        bm25_result = np.array([self.bm25.get_scores(queryy) for queryy in tqdm(tokenized_query, total=len(tokenized_query))])
+        sparse_result = query_vec * self.p_embedding.T
+        
+        if not isinstance(sparse_result, np.ndarray):
+            sparse_result = sparse_result.toarray()
+            
+        doc_scores = []
+        doc_indices = []
+        
+        for i in range(bm25_result.shape[0]):
+            sparse_result[i,:] = sparse_result[i,:] / np.max(sparse_result[i,:])
+            bm25_result[i,:] = bm25_result[i,:] / np.max(bm25_result[i,:])
+            result = (sparse_result[i,:] + bm25_result[i,:]) / 2
+            sorted_result = np.argsort(result)[::-1]
+            doc_scores.append(result[sorted_result].tolist()[:k])
+            doc_indices.append(sorted_result.tolist()[:k])
+        
+        return doc_scores, doc_indices
     
-    def tfidf_get_relevant_doc_bulk(
+    def get_relevant_doc_bulk(
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
 
@@ -387,23 +291,31 @@ class RerankSparseRetrieval:
         Note:
             vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
         """
-
+        tokenized_query = [self.tokenizer(query) for query in list(queries)]
         query_vec = self.tfidfv.transform(queries)
         assert (
             np.sum(query_vec) != 0
         ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
-
-        result = query_vec * self.p_embedding.T
-        if not isinstance(result, np.ndarray):
-            result = result.toarray()
+        
+        bm25_result = np.array([self.bm25.get_scores(query) for query in tqdm(tokenized_query, total=len(tokenized_query))])
+        sparse_result = query_vec * self.p_embedding.T
+        
+        if not isinstance(sparse_result, np.ndarray):
+            sparse_result = sparse_result.toarray()
+            
         doc_scores = []
         doc_indices = []
-        for i in range(result.shape[0]):
-            sorted_result = np.argsort(result[i, :])[::-1]
-            doc_scores.append(result[i, :][sorted_result].tolist()[:2*k])
-            doc_indices.append(sorted_result.tolist()[:2*k])
-            
+        
+        for i in range(bm25_result.shape[0]):
+            sparse_result[i,:] = sparse_result[i,:] / np.max(sparse_result[i,:])
+            bm25_result[i,:] = bm25_result[i,:] / np.max(bm25_result[i,:])
+            result = (sparse_result[i,:] + bm25_result[i,:]) / 2
+            sorted_result = np.argsort(result)[::-1]
+            doc_scores.append(result[sorted_result].tolist()[:k])
+            doc_indices.append(sorted_result.tolist()[:k])
+        
         return doc_scores, doc_indices
+
     
     def retrieve_faiss(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
@@ -549,13 +461,13 @@ if __name__ == "__main__":
     
     # Test sparse
     org_dataset = load_from_disk(args.dataset_name)
-    #full_ds = concatenate_datasets(
-    #    [
-    #        org_dataset["train"].flatten_indices(),
-    #        org_dataset["validation"].flatten_indices(),
-    #    ]
-    #)  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
-    full_ds = org_dataset["validation"]
+    full_ds = concatenate_datasets(
+        [
+            org_dataset["train"].flatten_indices(),
+            org_dataset["validation"].flatten_indices(),
+        ]
+    )  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
+    #full_ds = org_dataset["validation"]
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
 
@@ -563,7 +475,7 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
 
-    retriever = RerankSparseRetrieval(
+    retriever = RerankSparseRetrieval2(
         tokenize_fn=tokenizer.tokenize,
         data_path=args.data_path,
         context_path=args.context_path,

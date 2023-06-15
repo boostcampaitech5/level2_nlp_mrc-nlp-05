@@ -128,7 +128,7 @@ class BM25SparseRetrieval:
             print("Faiss Indexer Saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
     ) -> Union[Tuple[List, List], pd.DataFrame]:
 
         """
@@ -154,43 +154,69 @@ class BM25SparseRetrieval:
         assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
-            doc_scores, topk_doc = self.get_relevant_doc(query_or_dataset, k=topk)
+            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
             print("[Search query]\n", query_or_dataset, "\n")
 
             for i in range(topk):
                 print(f"Top-{i+1} passage with score {doc_scores[i]:4f}")
-                print(topk_doc[i])
+                print(self.contexts[doc_indices[i]])
 
-            return (doc_scores, topk_doc)
+            return (doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)])
 
         elif isinstance(query_or_dataset, Dataset):
 
             # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
-            total = []
             with timer("query exhaustive search"):
-                topk_doc = self.get_relevant_doc_bulk(
+                doc_scores, doc_indices = self.get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
-            for idx, example in enumerate(
-                tqdm(query_or_dataset, desc="Sparse retrieval: ")
-            ):
-                tmp = {
-                    # Query와 해당 id를 반환합니다.
-                    "question": example["question"],
-                    "id": example["id"],
-                    # Retrieve한 Passage의 id, context를 반환합니다.
-                    "context": " ".join(
-                        topk_doc[idx]
-                    ),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
+                
+            if split:
+                doc_scores = doc_scores.toarray()
+                doc_scores = doc_scores / np.max(doc_scores)
+                cqas_lst = []
+                for i in range(topk):
+                    total = []
+                    for idx, example in enumerate(
+                        tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                    ):
+                        tmp = {
+                            # Query와 해당 id를 반환합니다.
+                            "question": example["question"],
+                            "id": example["id"],
+                            # Retrieve한 Passage의 id, context를 반환합니다.
+                            "context": self.contexts[doc_indices[idx][i]],
+                        }
+                        if "context" in example.keys() and "answers" in example.keys():
+                            # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                            tmp["original_context"] = example["context"]
+                            tmp["answers"] = example["answers"]
+                        total.append(tmp)
+                    cqas = pd.DataFrame(total)
+                    cqas_lst.append(cqas)    
+                return doc_scores, cqas_lst       
+            else:
+                total = []
+                for idx, example in enumerate(
+                    tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                ):
+                    tmp = {
+                        # Query와 해당 id를 반환합니다.
+                        "question": example["question"],
+                        "id": example["id"],
+                        # Retrieve한 Passage의 id, context를 반환합니다.
+                        "context": " ".join(
+                            [self.contexts[pid] for pid in doc_indices[idx]]
+                        ),
+                    }
+                    if "context" in example.keys() and "answers" in example.keys():
+                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                        tmp["original_context"] = example["context"]
+                        tmp["answers"] = example["answers"]
+                    total.append(tmp)
 
-            cqas = pd.DataFrame(total)
-            return cqas
+                cqas = pd.DataFrame(total)
+                return cqas
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
 
@@ -204,11 +230,16 @@ class BM25SparseRetrieval:
             vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
         """
 
-        tokenized_query = self.tokenizer(query)
-        doc_score = self.p_embedding.get_scores(tokenized_query)
-        topk_doc = self.p_embedding.get_top_n(tokenized_query, self.contexts, n=k)
+        tokenized_query = [self.tokenizer(query) for query in list(query)]
+        result = np.array([self.bm25.get_scores(query) for query in tokenized_query])
+        doc_scores = []
+        doc_indices = []
+        for scores in tqdm(result, total=len(result)):
+            sorted_result = np.argsort(scores)[-k:][::-1]
+            doc_scores.append(scores[sorted_result])
+            doc_indices.append(sorted_result.tolist())
         
-        return doc_score, topk_doc
+        return doc_scores, doc_indices
 
     def get_relevant_doc_bulk(
         self, queries: List, k: Optional[int] = 1
@@ -225,8 +256,15 @@ class BM25SparseRetrieval:
         """
 
         tokenized_query = [self.tokenizer(query) for query in list(queries)]
-        topk_doc = [self.p_embedding.get_top_n(query, self.contexts, n=k) for query in tqdm(tokenized_query, total=len(tokenized_query))]
-        return topk_doc
+        result = np.array([self.bm25.get_scores(query) for query in tqdm(tokenized_query, total=len(tokenized_query))])
+        doc_scores = []
+        doc_indices = []
+        for scores in tqdm(result, total=len(result)):
+            sorted_result = np.argsort(scores)[-k:][::-1]
+            doc_scores.append(scores[sorted_result])
+            doc_indices.append(sorted_result.tolist())
+        
+        return doc_scores, doc_indices
 
     def retrieve_faiss(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
