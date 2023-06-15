@@ -5,7 +5,7 @@ wandb:
     
 model:
     model_name: klue/roberta-large
-    saved_model_path: /opt/ml/models/finetuning_dataset_roberta # inference 때 사용 # 1차 fine-tuning시 사용
+    saved_model_path: /opt/ml/models/train_dataset # inference 때 사용 # 1차 fine-tuning시 사용
     config_name: null
     tokenizer_name: null
     retrieval_tokenizer: monologg/koelectra-base-v3-finetuned-korquad # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
