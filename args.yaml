@@ -1,18 +1,18 @@
 wandb:
     use: True
     project: mrc_project
-    name: test # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
+    name: 'korquad_finetuning_2' # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
     
 model:
     model_name: klue/roberta-large
-    saved_model_path: /opt/ml/models/train_dataset # inference 때 사용
+    saved_model_path: /opt/ml/models/finetuning_dataset_roberta # inference 때 사용 # 1차 fine-tuning시 사용
     config_name: null
     tokenizer_name: null
-    retrieval_tokenizer: klue/roberta-large # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
+    retrieval_tokenizer: monologg/koelectra-base-v3-finetuned-korquad # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
 
 data:
     train_dataset_name: /opt/ml/input/data/train_dataset
-    test_dataset_name: /opt/ml/input/data/test_dataset
+    test_dataset_name: /opt/ml/input/data/test_dataset # eval inference에서 train
     overwrite_cache: False
     preprocessing_num_workers: null
     max_seq_length: 384
@@ -24,11 +24,12 @@ data:
     top_k_retrieval: 30
     use_faiss: False
     retrieval_type : bm25 # tfidf, bm25
+    data_type: original # original, korquad, korquad_hard, mix, mix_hard (설명은 prepare_dataset.py에)
 
 train:
     batch_size: 16
-    max_epoch: 3
-    learning_rate: 5.0e-5
+    max_epoch: 5
+    learning_rate: 8.0e-6
     eval_step: 100
     logging_step: 100
     save_step: 100
