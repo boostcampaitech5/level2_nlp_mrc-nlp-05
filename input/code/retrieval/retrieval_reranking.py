@@ -9,6 +9,7 @@ import faiss
 import numpy as np
 import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
+from sklearn.feature_extraction.text import TfidfVectorizer
 from rank_bm25 import BM25Okapi
 from tqdm.auto import tqdm
 
@@ -20,7 +21,7 @@ def timer(name):
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
 
-class BM25SparseRetrieval:
+class RerankSparseRetrieval:
     def __init__(
         self,
         tokenize_fn,
@@ -59,7 +60,10 @@ class BM25SparseRetrieval:
         )  # set 은 매번 순서가 바뀌므로
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
-    
+
+        self.tfidfv = TfidfVectorizer(
+            tokenizer=tokenize_fn, ngram_range=(1, 2), max_features=50000,
+        )
         self.bm25 = None  # get_sparse_embedding()로 생성합니다
         self.indexer = None  # build_faiss()로 생성합니다.
 
@@ -73,12 +77,21 @@ class BM25SparseRetrieval:
         """
 
         # Pickle을 저장합니다.
-        pickle_name = f"bm25_sparse_embedding.bin"
-        emd_path = os.path.join(self.data_path, pickle_name)
+        bm25_pickle_name = f"bm25_sparse_embedding.bin"
+        bm25_emd_path = os.path.join(self.data_path, bm25_pickle_name)
+        
+        tfidf_pickle_name = f"sparse_embedding.bin"
+        tfidfv_name = f"tfidv.bin"
+        tfidf_emd_path = os.path.join(self.data_path, tfidf_pickle_name)
+        tfidfv_path = os.path.join(self.data_path, tfidfv_name)
 
-        if os.path.isfile(emd_path):
-            with open(emd_path, "rb") as file:
+        if os.path.isfile(bm25_emd_path) and os.path.isfile(tfidf_emd_path):
+            with open(bm25_emd_path, "rb") as file:
                 self.bm25 = pickle.load(file)
+            with open(tfidf_emd_path, "rb") as file:
+                self.p_embedding = pickle.load(file)
+            with open(tfidfv_path, "rb") as file:
+                self.tfidfv = pickle.load(file)
             print("Embedding pickle load.")
         else:
             print("Build passage embedding")
@@ -86,8 +99,18 @@ class BM25SparseRetrieval:
             tokenized_corpus = [self.tokenizer(doc) for doc in self.contexts]
             self.bm25 = BM25Okapi(tokenized_corpus)
             
-            with open(emd_path, "wb") as file:
+            with open(bm25_emd_path, "wb") as file:
                 pickle.dump(self.bm25, file)
+            
+            self.p_embedding = self.tfidfv.fit_transform(self.contexts)
+            
+            print(self.p_embedding.shape)
+            
+            with open(tfidf_emd_path, "wb") as file:
+                pickle.dump(self.p_embedding, file)
+            with open(tfidfv_path, "wb") as file:
+                pickle.dump(self.tfidfv, file)
+                
             print("Embedding pickle saved.")
 
     def build_faiss(self, num_clusters=64) -> None:
@@ -151,10 +174,39 @@ class BM25SparseRetrieval:
                 Ground Truth가 없는 Query (test) -> Retrieval한 Passage만 반환합니다.
         """
 
-        assert self.bm25 is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
+        assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
         if isinstance(query_or_dataset, str):
-            doc_scores, doc_indices = self.get_relevant_doc(query_or_dataset, k=topk)
+            bm25_doc_scores, bm25_doc_indices = self.bm25_get_relevant_doc(query_or_dataset, k=topk)
+            tfidf_doc_scores, tfidf_doc_indices = self.tfidf_get_relevant_doc(query_or_dataset, k=topk)
+            
+            doc_indices = []
+            doc_scores = []
+            
+            for i in tqdm(range(len(bm25_doc_indices)), total=len(bm25_doc_indices)):
+                doc_indice, doc_score = [], []
+                bm25_doc_scores[i] = bm25_doc_scores[i] / np.max(bm25_doc_scores[i])
+                tfidf_doc_scores[i] = tfidf_doc_scores[i] / np.max(tfidf_doc_scores[i])  
+                 
+                for j in range(len(bm25_doc_indices[i])):
+                    if bm25_doc_indices[i][j] == tfidf_doc_indices[i][j]:
+                        doc_score.append((bm25_doc_scores[i][j] + tfidf_doc_scores[i][j])/2)
+                        doc_indice.append(bm25_doc_indices[i][j])
+                    else:
+                        doc_score.append(bm25_doc_scores[i][j])
+                        doc_indice.append(bm25_doc_indices[i][j])
+                        doc_score.append(tfidf_doc_scores[i][j])
+                        doc_indice.append(tfidf_doc_indices[i][j])
+                     
+                doc_score, doc_indice = np.array(doc_score), np.array(doc_indice)
+
+                # doc_scores를 기준으로 내림차순으로 정렬한 인덱스 배열 생성
+                sorted_indices = np.argsort(-doc_score)
+
+                # doc_scores와 doc_indices를 정렬된 인덱스를 기준으로 정렬
+                doc_scores.append(doc_score[sorted_indices][:topk])
+                doc_indices.append(doc_indice[sorted_indices][:topk])
+                
             print("[Search query]\n", query_or_dataset, "\n")
 
             for i in range(topk):
@@ -167,14 +219,42 @@ class BM25SparseRetrieval:
 
             # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
             with timer("query exhaustive search"):
-                doc_scores, doc_indices = self.get_relevant_doc_bulk(
+                bm25_doc_scores, bm25_doc_indices = self.bm25_get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
-                
+                tfidf_doc_scores, tfidf_doc_indices = self.tfidf_get_relevant_doc_bulk(
+                    query_or_dataset["question"], k=topk
+                )
+            
+            doc_indices = []
+            doc_scores = []
+            
+            for i in tqdm(range(len(bm25_doc_indices)), total=len(bm25_doc_indices)):
+                doc_indice, doc_score = [], []
+                bm25_doc_scores[i] = bm25_doc_scores[i] / np.max(bm25_doc_scores[i])
+                tfidf_doc_scores[i] = tfidf_doc_scores[i] / np.max(tfidf_doc_scores[i])  
+                 
+                for j in range(len(bm25_doc_indices[i])):
+                    if bm25_doc_indices[i][j] == tfidf_doc_indices[i][j]:
+                        doc_score.append((bm25_doc_scores[i][j] + tfidf_doc_scores[i][j])/2)
+                        doc_indice.append(bm25_doc_indices[i][j])
+                    else:
+                        doc_score.append(bm25_doc_scores[i][j])
+                        doc_indice.append(bm25_doc_indices[i][j])
+                        doc_score.append(tfidf_doc_scores[i][j])
+                        doc_indice.append(tfidf_doc_indices[i][j])
+                     
+                doc_score, doc_indice = np.array(doc_score), np.array(doc_indice)
+
+                # doc_scores를 기준으로 내림차순으로 정렬한 인덱스 배열 생성
+                sorted_indices = np.argsort(-doc_score)
+
+                # doc_scores와 doc_indices를 정렬된 인덱스를 기준으로 정렬
+                doc_scores.append(doc_score[sorted_indices][:topk])
+                doc_indices.append(doc_indice[sorted_indices][:topk])  
+            
             if split:
-                doc_scores = doc_scores.toarray()
-                doc_scores = doc_scores / np.max(doc_scores)
-                cqas_lst = []
+                cqas_lst = [] 
                 for i in range(topk):
                     total = []
                     for idx, example in enumerate(
@@ -194,9 +274,9 @@ class BM25SparseRetrieval:
                         total.append(tmp)
                     cqas = pd.DataFrame(total)
                     cqas_lst.append(cqas)    
-                return doc_scores, cqas_lst       
+                return doc_scores, cqas_lst
             else:
-                total = []
+                total = []        
                 for idx, example in enumerate(
                     tqdm(query_or_dataset, desc="Sparse retrieval: ")
                 ):
@@ -218,7 +298,7 @@ class BM25SparseRetrieval:
                 cqas = pd.DataFrame(total)
                 return cqas
 
-    def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
+    def bm25_get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
 
         """
         Arguments:
@@ -235,13 +315,13 @@ class BM25SparseRetrieval:
         doc_scores = []
         doc_indices = []
         for scores in tqdm(result, total=len(result)):
-            sorted_result = np.argsort(scores)[-k:][::-1]
+            sorted_result = np.argsort(scores)[-2*k:][::-1]
             doc_scores.append(scores[sorted_result])
             doc_indices.append(sorted_result.tolist())
         
         return doc_scores, doc_indices
 
-    def get_relevant_doc_bulk(
+    def bm25_get_relevant_doc_bulk(
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
 
@@ -260,12 +340,71 @@ class BM25SparseRetrieval:
         doc_scores = []
         doc_indices = []
         for scores in tqdm(result, total=len(result)):
-            sorted_result = np.argsort(scores)[-k:][::-1]
+            sorted_result = np.argsort(scores)[-2*k:][::-1]
             doc_scores.append(scores[sorted_result])
             doc_indices.append(sorted_result.tolist())
         
         return doc_scores, doc_indices
 
+    def tfidf_get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
+
+        """
+        Arguments:
+            query (str):
+                하나의 Query를 받습니다.
+            k (Optional[int]): 1
+                상위 몇 개의 Passage를 반환할지 정합니다.
+        Note:
+            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
+        """
+
+        with timer("transform"):
+            query_vec = self.tfidfv.transform([query])
+        assert (
+            np.sum(query_vec) != 0
+        ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
+
+        with timer("query ex search"):
+            result = query_vec * self.p_embedding.T
+        if not isinstance(result, np.ndarray):
+            result = result.toarray()
+
+        sorted_result = np.argsort(result.squeeze())[::-1]
+        doc_score = result.squeeze()[sorted_result].tolist()[:2*k]
+        doc_indices = sorted_result.tolist()[:2*k]
+        return doc_score, doc_indices
+    
+    def tfidf_get_relevant_doc_bulk(
+        self, queries: List, k: Optional[int] = 1
+    ) -> Tuple[List, List]:
+
+        """
+        Arguments:
+            queries (List):
+                하나의 Query를 받습니다.
+            k (Optional[int]): 1
+                상위 몇 개의 Passage를 반환할지 정합니다.
+        Note:
+            vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
+        """
+
+        query_vec = self.tfidfv.transform(queries)
+        assert (
+            np.sum(query_vec) != 0
+        ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
+
+        result = query_vec * self.p_embedding.T
+        if not isinstance(result, np.ndarray):
+            result = result.toarray()
+        doc_scores = []
+        doc_indices = []
+        for i in range(result.shape[0]):
+            sorted_result = np.argsort(result[i, :])[::-1]
+            doc_scores.append(result[i, :][sorted_result].tolist()[:2*k])
+            doc_indices.append(sorted_result.tolist()[:2*k])
+            
+        return doc_scores, doc_indices
+    
     def retrieve_faiss(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List, List], pd.DataFrame]:
@@ -410,13 +549,13 @@ if __name__ == "__main__":
     
     # Test sparse
     org_dataset = load_from_disk(args.dataset_name)
-    full_ds = concatenate_datasets(
-        [
-            org_dataset["train"].flatten_indices(),
-            org_dataset["validation"].flatten_indices(),
-        ]
-    )  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
-    #full_ds = org_dataset["validation"]
+    #full_ds = concatenate_datasets(
+    #    [
+    #        org_dataset["train"].flatten_indices(),
+    #        org_dataset["validation"].flatten_indices(),
+    #    ]
+    #)  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
+    full_ds = org_dataset["validation"]
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
 
@@ -424,7 +563,7 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
 
-    retriever = BM25SparseRetrieval(
+    retriever = RerankSparseRetrieval(
         tokenize_fn=tokenizer.tokenize,
         data_path=args.data_path,
         context_path=args.context_path,
