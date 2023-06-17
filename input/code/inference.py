@@ -19,6 +19,7 @@ from datasets import (
     load_from_disk
 )
 import evaluate
+from retrieval.retrieval_ES import ESSparseRetrieval
 from retrieval.retrieval_TFIDF import TFIDFSparseRetrieval
 from retrieval.retrieval_BM25 import BM25SparseRetrieval
 from trainer_qa import QuestionAnsweringTrainer
@@ -128,12 +129,16 @@ def run_sparse_retrieval(
         retriever = TFIDFSparseRetrieval
     elif data_args.retrieval_type == 'bm25':
         retriever = BM25SparseRetrieval
+    elif data_args.retrieval_type == 'es':
+        retriever = ESSparseRetrieval
+    
+    if data_args.retrieval_type == 'es':
+        retriever = retriever(data_path=data_path, context_path=context_path) 
+    else:
+        retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
         
-    retriever = retriever(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    ) 
     retriever.get_sparse_embedding()
-
+    
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
         df = retriever.retrieve_faiss(
