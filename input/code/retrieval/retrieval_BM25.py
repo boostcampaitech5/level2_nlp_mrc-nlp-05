@@ -25,9 +25,9 @@ class BM25SparseRetrieval:
     def __init__(
         self,
         tokenize_fn,
+        args,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
-        args
     ) -> None:
 
         """

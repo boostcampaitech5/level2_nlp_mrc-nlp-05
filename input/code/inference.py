@@ -126,12 +126,18 @@ def run_sparse_retrieval(
     # Query에 맞는 Passage들을 Retrieval 합니다.
     if data_args.retrieval_type == 'tfidf':
         retriever = TFIDFSparseRetrieval
+        
+        retriever = retriever(
+        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
+        )
+        
     elif data_args.retrieval_type == 'bm25':
         retriever = BM25SparseRetrieval
         
-    retriever = retriever(
-        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path
-    ) 
+        retriever = retriever(
+        tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path, args=OmegaConf.load(f'/opt/ml/args.yaml')
+        )
+        
     retriever.get_sparse_embedding()
 
     if data_args.use_faiss:
