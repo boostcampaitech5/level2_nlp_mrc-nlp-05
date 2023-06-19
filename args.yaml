@@ -15,7 +15,7 @@ data:
     test_dataset_name: /opt/ml/input/data/test_dataset
     overwrite_cache: False
     preprocessing_num_workers: null
-    max_seq_length: 384
+    max_seq_length: 512
     pad_to_max_length: False
     doc_stride: 128
     max_answer_length: 30
@@ -24,6 +24,7 @@ data:
     top_k_retrieval: 30
     use_faiss: False
     retrieval_type : bm25 # tfidf, bm25
+    unuse_remove : False # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
 
 train:
     batch_size: 16
@@ -41,3 +42,5 @@ train:
     warmup_steps: 0
     weight_decay: 0.0
     seed: 42
+    use_sep_token_in_inference: False
+    fix_embedding_layer: True # True 하면, 학습 시 embedding layer fix !
