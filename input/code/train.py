@@ -21,6 +21,7 @@ from omegaconf import OmegaConf
 from omegaconf import DictConfig
 from utils.naming import wandb_naming
 from prepare_dataset import prepare_dataset
+from custom import NewModel
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +101,14 @@ def main(args):
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-    )
+    if model_args.LSTM_model :
+        model = NewModel(model_args.model_name_or_path, config)
+    else :
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     print(
         type(training_args),
