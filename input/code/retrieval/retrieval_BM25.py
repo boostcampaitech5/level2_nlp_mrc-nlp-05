@@ -11,6 +11,7 @@ import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
 from rank_bm25 import BM25Okapi
 from tqdm.auto import tqdm
+from omegaconf import OmegaConf
 
 
 @contextmanager
@@ -26,6 +27,7 @@ class BM25SparseRetrieval:
         tokenize_fn,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
+        args
     ) -> None:
 
         """
@@ -171,23 +173,42 @@ class BM25SparseRetrieval:
                 topk_doc = self.get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
-            for idx, example in enumerate(
-                tqdm(query_or_dataset, desc="Sparse retrieval: ")
-            ):
-                tmp = {
-                    # Query와 해당 id를 반환합니다.
-                    "question": example["question"],
-                    "id": example["id"],
-                    # Retrieve한 Passage의 id, context를 반환합니다.
-                    "context": "[SEP]".join(
-                        topk_doc[idx]
-                    ),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
+            if args.train.use_sep_token_in_inference :
+                for idx, example in enumerate(
+                    tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                ):
+                    tmp = {
+                        # Query와 해당 id를 반환합니다.
+                        "question": example["question"],
+                        "id": example["id"],
+                        # Retrieve한 Passage의 id, context를 반환합니다.
+                        "context": "[SEP]".join(
+                            topk_doc[idx]
+                        ),
+                    }
+                    if "context" in example.keys() and "answers" in example.keys():
+                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                        tmp["original_context"] = example["context"]
+                        tmp["answers"] = example["answers"]
+                    total.append(tmp)
+            else :
+                for idx, example in enumerate(
+                    tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                ):
+                    tmp = {
+                        # Query와 해당 id를 반환합니다.
+                        "question": example["question"],
+                        "id": example["id"],
+                        # Retrieve한 Passage의 id, context를 반환합니다.
+                        "context": " ".join(
+                            topk_doc[idx]
+                        ),
+                    }
+                    if "context" in example.keys() and "answers" in example.keys():
+                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                        tmp["original_context"] = example["context"]
+                        tmp["answers"] = example["answers"]
+                    total.append(tmp)
 
             cqas = pd.DataFrame(total)
             return cqas
@@ -277,23 +298,42 @@ class BM25SparseRetrieval:
                 doc_scores, doc_indices = self.get_relevant_doc_bulk_faiss(
                     queries, k=topk
                 )
-            for idx, example in enumerate(
-                tqdm(query_or_dataset, desc="Sparse retrieval: ")
-            ):
-                tmp = {
-                    # Query와 해당 id를 반환합니다.
-                    "question": example["question"],
-                    "id": example["id"],
-                    # Retrieve한 Passage의 id, context를 반환합니다.
-                    "context": "[SEP]".join(
-                        [self.contexts[pid] for pid in doc_indices[idx]]
-                    ),
-                }
-                if "context" in example.keys() and "answers" in example.keys():
-                    # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                    tmp["original_context"] = example["context"]
-                    tmp["answers"] = example["answers"]
-                total.append(tmp)
+            if args.train.use_sep_token_in_inference :
+                for idx, example in enumerate(
+                    tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                ):
+                    tmp = {
+                        # Query와 해당 id를 반환합니다.
+                        "question": example["question"],
+                        "id": example["id"],
+                        # Retrieve한 Passage의 id, context를 반환합니다.
+                        "context": "[SEP]".join(
+                            [self.contexts[pid] for pid in doc_indices[idx]]
+                        ),
+                    }
+                    if "context" in example.keys() and "answers" in example.keys():
+                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                        tmp["original_context"] = example["context"]
+                        tmp["answers"] = example["answers"]
+                    total.append(tmp)
+            else :
+                for idx, example in enumerate(
+                    tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                ):
+                    tmp = {
+                        # Query와 해당 id를 반환합니다.
+                        "question": example["question"],
+                        "id": example["id"],
+                        # Retrieve한 Passage의 id, context를 반환합니다.
+                        "context": " ".join(
+                            topk_doc[idx]
+                        ),
+                    }
+                    if "context" in example.keys() and "answers" in example.keys():
+                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                        tmp["original_context"] = example["context"]
+                        tmp["answers"] = example["answers"]
+                    total.append(tmp)
 
             return pd.DataFrame(total)
 
@@ -385,11 +425,13 @@ if __name__ == "__main__":
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
-
+    yaml_args = OmegaConf.load('/opt/ml/args.yaml')
+    
     retriever = BM25SparseRetrieval(
         tokenize_fn=tokenizer.tokenize,
         data_path=args.data_path,
         context_path=args.context_path,
+        args=yaml_args,
     )
 
     query = "대통령을 포함한 미국의 행정부 견제권을 갖는 국가 기관은?"
