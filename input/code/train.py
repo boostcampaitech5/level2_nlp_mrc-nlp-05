@@ -76,8 +76,9 @@ def main(args):
         input['context'] = pattern.sub("  ", input['context'])
         return input
     
-    if training_args.do_train : # 학습 시
-        datasets = datasets.map(modifying)
+    if data_args.unuse_remove :
+        if training_args.do_train : # 학습 시
+            datasets = datasets.map(modifying)
     
     '''wiki_pedia eval 시는 어떻게 바꿔야 할 지 몰라서 남겨 놓음!'''    
 
@@ -329,7 +330,15 @@ def run_mrc(
         f1 = metrics['f1']
         
         return {'eval_exact_match' : exact_match, 'eval_f1' : f1}
-
+    
+    if args.train.fix_embedding_layer :
+        for name, param in model.named_parameters():
+            if 'embedding' in name :
+                param.requires_grad = False
+    
+    for name, param in model.named_parameters():
+        print(name, param.requires_grad)
+    
     # Trainer 초기화
     trainer = QuestionAnsweringTrainer(
         model=model,
