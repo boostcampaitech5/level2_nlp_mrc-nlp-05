@@ -210,7 +210,7 @@ class BM25SparseRetrieval:
                         # Retrieve한 Passage의 id, context를 반환합니다.
                         "context": " ".join(
                             [self.contexts[pid] for pid in doc_indices[idx]]
-                        ) if not args.train.use_sep_token_in_inference else "[SEP]".join(
+                        ) if not self.args.train.use_sep_token_in_inference else "[SEP]".join(
                             [self.contexts[pid] for pid in doc_indices[idx]]
                         ),
                     }
