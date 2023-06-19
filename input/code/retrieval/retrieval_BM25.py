@@ -61,7 +61,7 @@ class BM25SparseRetrieval:
         )  # set 은 매번 순서가 바뀌므로
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
-    
+        self.args=args
         self.p_embedding = None  # get_sparse_embedding()로 생성합니다
         self.indexer = None  # build_faiss()로 생성합니다.
 
@@ -173,7 +173,7 @@ class BM25SparseRetrieval:
                 topk_doc = self.get_relevant_doc_bulk(
                     query_or_dataset["question"], k=topk
                 )
-            if args.train.use_sep_token_in_inference :
+            if self.args.train.use_sep_token_in_inference :
                 for idx, example in enumerate(
                     tqdm(query_or_dataset, desc="Sparse retrieval: ")
                 ):
@@ -298,7 +298,7 @@ class BM25SparseRetrieval:
                 doc_scores, doc_indices = self.get_relevant_doc_bulk_faiss(
                     queries, k=topk
                 )
-            if args.train.use_sep_token_in_inference :
+            if self.args.train.use_sep_token_in_inference :
                 for idx, example in enumerate(
                     tqdm(query_or_dataset, desc="Sparse retrieval: ")
                 ):
