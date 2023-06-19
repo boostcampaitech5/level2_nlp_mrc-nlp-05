@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import wandb
+import re
 
 from datasets import DatasetDict
 import evaluate
@@ -71,7 +72,18 @@ def main(args):
     logger.info("Training/evaluation parameters %s", training_args)
 
     datasets = prepare_dataset(data_args.data_type, data_args.train_dataset_name, training_args.seed)
+
+    def modifying(input) :
+        pattern = re.compile('\\\\n')
+        input['context'] = pattern.sub("  ", input['context'])
+        return input
     
+    if data_args.unuse_remove :
+        if training_args.do_train : # 학습 시
+            datasets = datasets.map(modifying)
+    
+    '''wiki_pedia eval 시는 어떻게 바꿔야 할 지 몰라서 남겨 놓음!'''    
+
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
@@ -320,7 +332,15 @@ def run_mrc(
         f1 = metrics['f1']
         
         return {'eval_exact_match' : exact_match, 'eval_f1' : f1}
-
+    
+    if args.train.fix_embedding_layer :
+        for name, param in model.named_parameters():
+            if 'embedding' in name :
+                param.requires_grad = False
+    
+    for name, param in model.named_parameters():
+        print(name, param.requires_grad)
+    
     # Trainer 초기화
     trainer = QuestionAnsweringTrainer(
         model=model,

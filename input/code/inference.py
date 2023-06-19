@@ -156,7 +156,7 @@ def run_sparse_retrieval(
     if data_args.retrieval_type == 'es':
         retriever = ESSparseRetrieval
         retriever = retriever(data_path=data_path, context_path=context_path)
-    else:
+    else :
         if data_args.retrieval_type == 'tfidf':
             retriever = TFIDFSparseRetrieval
         elif data_args.retrieval_type == 'bm25':
@@ -165,7 +165,11 @@ def run_sparse_retrieval(
             retriever = RerankSparseRetrieval
         elif data_args.retrieval_type == 'tfidf+bm25_2':
             retriever = RerankSparseRetrieval2
-        retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
+        
+        if data_args.retrieval_type == 'bm25' :
+            retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path,args=OmegaConf.load(f'/opt/ml/args.yaml'))
+        else :
+            retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
 
     retriever.get_sparse_embedding()
     
