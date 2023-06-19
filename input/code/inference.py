@@ -24,9 +24,10 @@ import evaluate
 import argparse
 import json
 # import wandb
-from retrieval.retrieval_ES import ESSparseRetrieval
+
 from retrieval.retrieval_TFIDF import TFIDFSparseRetrieval
 from retrieval.retrieval_BM25 import BM25SparseRetrieval
+from retrieval.retrieval_ES import ESSparseRetrieval
 from retrieval.retrieval_reranking import RerankSparseRetrieval
 from retrieval.retrieval_reranking2 import RerankSparseRetrieval2
 from scores_voting import post_process_voting
@@ -46,7 +47,6 @@ import konlpy.tag as konlpy
 import discord
 
 logger = logging.getLogger(__name__)
-
 
 def main(args):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
@@ -143,7 +143,6 @@ def main(args):
     if training_args.do_eval or training_args.do_predict:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model, test_df, doc_scores)
 
-
 def run_sparse_retrieval(
     tokenize_fn: Callable[[str], List[str]],
     datasets: DatasetDict,
@@ -154,23 +153,20 @@ def run_sparse_retrieval(
 ) -> DatasetDict:
 
     # Query에 맞는 Passage들을 Retrieval 합니다.
-    if data_args.retrieval_type == 'tfidf':
-        retriever = TFIDFSparseRetrieval
-    elif data_args.retrieval_type == 'bm25':
-        retriever = BM25SparseRetrieval
-    elif data_args.retrieval_type == 'tfidf+bm25':
-        retriever = RerankSparseRetrieval
-    elif data_args.retrieval_type == 'tfidf+bm25_2':
-        retriever = RerankSparseRetrieval2
-    elif data_args.retrieval_type == 'es':
-        retriever = ESSparseRetrieval
-    
     if data_args.retrieval_type == 'es':
-        retriever = retriever(data_path=data_path, context_path=context_path) 
+        retriever = ESSparseRetrieval
+        retriever = retriever(data_path=data_path, context_path=context_path)
     else:
+        if data_args.retrieval_type == 'tfidf':
+            retriever = TFIDFSparseRetrieval
+        elif data_args.retrieval_type == 'bm25':
+            retriever = BM25SparseRetrieval
+        elif data_args.retrieval_type == 'tfidf+bm25':
+            retriever = RerankSparseRetrieval
+        elif data_args.retrieval_type == 'tfidf+bm25_2':
+            retriever = RerankSparseRetrieval2
         retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
 
-        
     retriever.get_sparse_embedding()
     
     if data_args.use_faiss:
@@ -222,7 +218,6 @@ def run_sparse_retrieval(
     else:
         datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
         return [datasets], None
-
 
 def run_mrc(
     data_args: DictConfig,

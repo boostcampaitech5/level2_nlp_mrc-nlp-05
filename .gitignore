@@ -18,3 +18,7 @@ input/data/*
 !README.md
 !*.pdf
 *.json
+*.ipynb
+discord_bot.py
+server.py
+client.py
