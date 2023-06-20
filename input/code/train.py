@@ -4,6 +4,7 @@ import sys
 import wandb
 import re
 
+from tqdm import tqdm
 from datasets import DatasetDict
 import evaluate
 import argparse
@@ -113,12 +114,29 @@ def main(args):
         type(tokenizer),
         type(model),
     )
-
+    
+    if model_args.tok_train:
+        tokenizer = tokenizer_train(tokenizer=tokenizer, datasets=datasets)
+        
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
 
 
+def tokenizer_train(tokenizer, datasets):
+    assert tokenizer.is_fast is True, "tokenizer is not fast"
+    
+    def batch_iterator():
+        dataset = datasets["train"]
+        for start_idx in range(0, len(dataset), args.train.batch_size):
+            yield dataset[start_idx : start_idx + args.train.batch_size]['context']    
+            
+    print("======================================= TOK_TRAIN =======================================")
+    new_tokenizer = tokenizer.train_new_from_iterator(batch_iterator(), vocab_size=32000)
+    print("======================================= COMPLETE =======================================")
+    
+    return new_tokenizer
+    
 def run_mrc(
     data_args: DictConfig,
     training_args: TrainingArguments,
