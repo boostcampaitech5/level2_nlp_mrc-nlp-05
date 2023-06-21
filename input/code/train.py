@@ -114,14 +114,13 @@ def main(args):
         type(tokenizer),
         type(model),
     )
-    
+      
     if model_args.tok_train:
         tokenizer = tokenizer_train(tokenizer=tokenizer, datasets=datasets)
-        
+    
     # do_train mrc model 혹은 do_eval mrc model
     if training_args.do_train or training_args.do_eval:
         run_mrc(data_args, training_args, model_args, datasets, tokenizer, model)
-
 
 def tokenizer_train(tokenizer, datasets):
     assert tokenizer.is_fast is True, "tokenizer is not fast"
@@ -134,7 +133,7 @@ def tokenizer_train(tokenizer, datasets):
     print("======================================= TOK_TRAIN =======================================")
     new_tokenizer = tokenizer.train_new_from_iterator(batch_iterator(), vocab_size=32000)
     print("======================================= COMPLETE =======================================")
-    
+    # datasets.unique() -> 불용어 제거 -> add_token
     return new_tokenizer
     
 def run_mrc(
@@ -354,8 +353,39 @@ def run_mrc(
     if args.train.fix_embedding_layer :
         for name, param in model.named_parameters():
             if 'embedding' in name :
+                param.requires_grad = False 
+                
+    # 토크나이저 학습용
+    if args.train.fix_else_layer:
+        for name, param in model.named_parameters():
+            if not 'embedding' in name:
                 param.requires_grad = False
-    
+                
+        f = open('/opt/ml/input/data/unique_word.txt', 'r')
+        new_tokens = []
+        while True:
+            line = f.readline()
+            line = line.replace('\n', '')
+            line = line.replace('\t', '')
+            new_tokens.append(line)
+            
+            if not line: 
+                break
+
+        f.close()
+        # check if the tokens are already in the vocabulary
+        if '' in new_tokens:
+            new_tokens.remove('')
+            
+        new_tokens = set(new_tokens) - set(tokenizer.vocab.keys())
+        print("=========================== ADD_NEW_TOKEN ===========================")
+        print(new_tokens)
+        # add the tokens to the tokenizer vocabulary
+        tokenizer.add_tokens(list(new_tokens))
+        # add new, random embeddings for the new tokens
+        model.resize_token_embeddings(len(tokenizer))
+        print("=========================== Complete ===========================")
+
     for name, param in model.named_parameters():
         print(name, param.requires_grad)
     
