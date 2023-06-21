@@ -235,10 +235,13 @@ def run_sparse_retrieval(
         )
     
     if data_args.split:
+        dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13') ##
         wikiinference = WikiInference("snunlp-KR-ELECTRA-discriminator-base.ckpt")
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
+            print(f"{i}번째 document answer sentence inerence 중...")
             df_list[i] = wikiinference.find_answer_sentence(df_list[i])
+            df_list[i]['question'] = dataset2['validation']['question'] ## 
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i])})
             dataset_list.append(dataset)
         return dataset_list, doc_scores

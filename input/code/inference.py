@@ -44,7 +44,6 @@ from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import konlpy.tag as konlpy
-import discord
 
 logger = logging.getLogger(__name__)
 
@@ -214,8 +213,10 @@ def run_sparse_retrieval(
         )
     
     if data_args.split:
+        dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13')
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
+            df_list[i]['question'] = dataset2['validation']['question']
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
             dataset_list.append(dataset)
         return dataset_list, doc_scores

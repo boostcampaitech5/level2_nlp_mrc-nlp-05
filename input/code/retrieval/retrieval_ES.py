@@ -71,7 +71,7 @@ class ESSparseRetrieval:
                     )
                     
                 if split:
-                    doc_scores = doc_scores
+                    doc_scores = np.array(doc_scores)
                     doc_scores = doc_scores / np.max(doc_scores)
                     cqas_lst = []
                     for i in range(topk):
