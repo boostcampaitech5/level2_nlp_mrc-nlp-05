@@ -58,10 +58,10 @@ if __name__ == "__main__":
         "--scores_list", nargs='+', type=float, help="list of float"
     )
     parser.add_argument(
-        "--folder_path", default=f"/opt/ensemble", type=str, help="folder path"
+        "--folder_path", default=f"/opt/ml/ensemble", type=str, help="folder path"
     )
     parser.add_argument(
-        "--file_number", type=int, helf="ensemble file number"
+        "--file_number", type=int, help="ensemble file number"
     )
     
     test_dataset = load_from_disk("/opt/ml/input/data/test_dataset")

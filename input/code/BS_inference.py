@@ -239,11 +239,11 @@ def run_sparse_retrieval(
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
             df_list[i] = wikiinference.find_answer_sentence(df_list[i])
-            dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
+            dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i])})
             dataset_list.append(dataset)
         return dataset_list, doc_scores
     else:
-        datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
+        datasets = DatasetDict({"validation": Dataset.from_pandas(df)})
         return [datasets], None
 
 def run_mrc(
