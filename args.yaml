@@ -5,7 +5,7 @@ wandb:
 
 model:
     model_name: klue/roberta-large
-    saved_model_path: /opt/ml/models/train_dataset # inference 때 사용# inference 때 사용 및 korquad 1차 fine-tuning시 finetuning_dataset_roberta 사용
+    saved_model_path: /opt/ml/BSmodel # inference 때 사용# inference 때 사용 및 korquad 1차 fine-tuning시 finetuning_dataset_roberta 사용
     config_name: null
     tokenizer_name: null
     retrieval_tokenizer: klue/roberta-large # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
@@ -16,16 +16,16 @@ data:
     test_dataset_name: /opt/ml/input/data/test_dataset
     overwrite_cache: False
     preprocessing_num_workers: null
-    max_seq_length: 512
+    max_seq_length: 384
     pad_to_max_length: False
     doc_stride: 128
     max_answer_length: 30
     eval_retrieval: True
     num_clusters: 64
-    top_k_retrieval: 30
+    top_k_retrieval: 40
     use_faiss: False
     data_type: original # original, korquad, korquad_hard, mix, mix_hard (설명은 prepare_dataset.py에)
-    split: False # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
+    split: True # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
     retrieval_type: es # tfidf, bm25, tfidf+bm25, tfidf+bm25_2, es (es는 bin 파일을 생성하지 않습니다.)
     unuse_remove : False # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
 
@@ -38,8 +38,8 @@ train:
     save_step: 100
     gradient_accumulation: 1
     do_train: True
-    do_eval: True # train에서 True, 제출용 inference에서는 False, eval inference는 True
-    do_predict: False # train에서 False, 제출용 inference에서는 True, eval inference에서는 False
+    do_eval: False # train에서 True, 제출용 inference에서는 False, eval inference는 True
+    do_predict: True # train에서 False, 제출용 inference에서는 True, eval inference에서는 False
     train_output_dir: /opt/ml/models/train_dataset # korquad 1차 finetuning 시 저장할 dir 이름(예: finetuning_dataset_roberta)으로 바꿔줘야 함
     inference_output_dir: /opt/ml/outputs/test_dataset
     warmup_steps: 0
