@@ -1,7 +1,7 @@
 wandb:
     use: True
     project: curriculum!!!
-    name: not curri/Linear/mix_hard/accumul 4 # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
+    name: not curri/original/accumul 4 # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
 
 model:
     model_name: klue/roberta-large
@@ -30,12 +30,12 @@ data:
     split: True # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
     retrieval_type: tfidf+bm25 # tfidf, bm25, tfidf+bm25, tfidf+bm25_2, es (es는 bin 파일을 생성하지 않습니다.)
     unuse_remove : True # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
-    curriculum: True # Curriculum Learning 이용 시, True
+    curriculum: False # Curriculum Learning 이용 시, True
 
 train:
     batch_size: 16
     max_epoch: 3
-    learning_rate: 9.0e-6
+    learning_rate: 6.0e-6
     eval_step: 50
     logging_step: 50
     save_step: 50
