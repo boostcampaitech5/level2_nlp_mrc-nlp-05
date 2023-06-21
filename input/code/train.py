@@ -3,8 +3,9 @@ import os
 import sys
 import wandb
 import re
+import pandas as pd
 
-from datasets import DatasetDict
+from datasets import DatasetDict, Dataset
 import evaluate
 import argparse
 from trainer_qa import QuestionAnsweringTrainer
@@ -21,7 +22,7 @@ from omegaconf import OmegaConf
 from omegaconf import DictConfig
 from utils.naming import wandb_naming
 from prepare_dataset import prepare_dataset
-from custom import NewModel
+from custom import NewModelwithReverseLSTM, NewModelwithLinear
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def main(args):
         warmup_steps=args.train.warmup_steps,
         weight_decay=args.train.weight_decay,
         load_best_model_at_end=True,
-        metric_for_best_model='exact_match'
+        metric_for_best_model='exact_match',
     )
     
     model_args.model_name_or_path = model_args.saved_model_path if model_args.do_finetuning else model_args.model_name
@@ -56,8 +57,7 @@ def main(args):
             args.wandb.name, model_args.model_name, training_args.per_device_train_batch_size, training_args.num_train_epochs, 
             training_args.learning_rate, training_args.warmup_steps, training_args.weight_decay))
         training_args.report_to = ["wandb"]
-    else:
-        wandb.init(should_run=False)
+
 
     print(f"model is from {model_args.model_name_or_path}")
     print(f"data is from {data_args.train_dataset_name if training_args.do_train else data_args.test_dataset_name}")
@@ -101,8 +101,10 @@ def main(args):
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
-    if model_args.LSTM_model :
-        model = NewModel(model_args.model_name_or_path, config)
+    if model_args.Custom_model == 'ReverseLSTM':
+        model = NewModelwithReverseLSTM(model_args.model_name_or_path, config)
+    elif model_args.Custom_model == 'Linear' :
+        model = NewModelwithLinear(model_args.model_name_or_path, config)
     else :
         model = AutoModelForQuestionAnswering.from_pretrained(
             model_args.model_name_or_path,
@@ -283,7 +285,7 @@ def run_mrc(
             ]
         return tokenized_examples
 
-    if training_args.do_eval:
+    if training_args.do_eval: # train 시 True, inference 시 False
         eval_dataset = datasets["validation"]
 
         # Validation Feature 생성
@@ -342,63 +344,160 @@ def run_mrc(
             if 'embedding' in name :
                 param.requires_grad = False
     
-    for name, param in model.named_parameters():
-        print(name, param.requires_grad)
+    # for name, param in model.named_parameters():
+    #     print(name, param.requires_grad)
     
-    # Trainer 초기화
-    trainer = QuestionAnsweringTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        eval_examples=datasets["validation"] if training_args.do_eval else None,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        post_process_function=post_processing_function,
-        compute_metrics=compute_metrics,
-    )
-
-
-    # Training
-    if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif os.path.isdir(model_args.model_name_or_path):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train() # resume_from_checkpoint=checkpoint
-        trainer.save_model()  # Saves the tokenizer too for easy upload
-
-        metrics = train_result.metrics
-        metrics["train_samples"] = len(train_dataset)
-
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
-
-        output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
-
-        with open(output_train_file, "w") as writer:
-            logger.info("***** Train results *****")
-            for key, value in sorted(train_result.metrics.items()):
-                logger.info(f"  {key} = {value}")
-                writer.write(f"{key} = {value}\n")
-
-        # State 저장
-        trainer.state.save_to_json(
-            os.path.join(training_args.output_dir, "trainer_state.json")
+    if not data_args.curriculum:
+        # Trainer 초기화
+        trainer = QuestionAnsweringTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            eval_examples=datasets["validation"] if training_args.do_eval else None,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            post_process_function=post_processing_function,
+            compute_metrics=compute_metrics,
         )
 
-    # Evaluation
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        metrics = trainer.evaluate()
 
-        metrics["eval_samples"] = len(eval_dataset)
+        # Training
+        if training_args.do_train:
+            if last_checkpoint is not None:
+                checkpoint = last_checkpoint
+            elif os.path.isdir(model_args.model_name_or_path):
+                checkpoint = model_args.model_name_or_path
+            else:
+                checkpoint = None
+            train_result = trainer.train() # resume_from_checkpoint=checkpoint
+            trainer.save_model()  # Saves the tokenizer too for easy upload
 
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
+            metrics = train_result.metrics
+            metrics["train_samples"] = len(train_dataset)
+
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
+
+            output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
+
+            with open(output_train_file, "w") as writer:
+                logger.info("***** Train results *****")
+                for key, value in sorted(train_result.metrics.items()):
+                    logger.info(f"  {key} = {value}")
+                    writer.write(f"{key} = {value}\n")
+
+            # State 저장
+            trainer.state.save_to_json(
+                os.path.join(training_args.output_dir, "trainer_state.json")
+            )
+
+        # Evaluation
+        if training_args.do_eval:
+            logger.info("*** Evaluate ***")
+            metrics = trainer.evaluate()
+
+            metrics["eval_samples"] = len(eval_dataset)
+
+            trainer.log_metrics("eval", metrics)
+            trainer.save_metrics("eval", metrics)
+    else :
+        # curriculum learning
+        for i in range(4) :
+            
+            print(f"***** Curriculum Learning에서 {i+1}번째다! *****")
+            csv_file=pd.read_csv(f"/opt/ml/input/data/curriculum_dataset/level{i}.csv")
+            train_dataset=Dataset.from_pandas(csv_file)
+            
+            lst = []
+            for j in range(len(train_dataset['context'])) :
+                check=eval(train_dataset['answers'][j])
+                lst.append({'answer_start' : check['answer_start'], 'text' : check['text']})
+
+            train_dataset=train_dataset.remove_columns(['answers'])
+            train_dataset=train_dataset.add_column("answers",lst)
+            
+            def modifying(input) :
+                pattern = re.compile('\\\\n')
+                input['context'] = pattern.sub("  ", input['context'])
+                return input
+            
+            if data_args.unuse_remove :
+                if training_args.do_train : # 학습 시
+                    train_dataset = train_dataset.map(modifying)
+            
+            print(f"{i}번째 데이터의 크기는 .. ? {len(train_dataset['answers'])}")
+            train_dataset = train_dataset.map(
+                prepare_train_features,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                )
+            print(f"변화가 생기는가? {len(train_dataset['input_ids'])}")
+            # in Curriculum.py
+            trainer = QuestionAnsweringTrainer(
+                model=model,
+                args=training_args,
+                train_dataset=train_dataset if training_args.do_train else None,
+                eval_dataset=eval_dataset if training_args.do_eval else None,
+                eval_examples=datasets["validation"] if training_args.do_eval else None,
+                tokenizer=tokenizer,
+                data_collator=data_collator,
+                post_process_function=post_processing_function,
+                compute_metrics=compute_metrics,
+                #report_to='wandb'
+            )
+            
+    
+            
+    
+            # Training
+            if training_args.do_train:
+                if last_checkpoint is not None:
+                    checkpoint = last_checkpoint
+                elif os.path.isdir(model_args.model_name_or_path):
+                    checkpoint = model_args.model_name_or_path
+                else:
+                    checkpoint = None
+
+                train_result = trainer.train() # resume_from_checkpoint=checkpoint
+                trainer.save_model()  # Saves the tokenizer too for easy upload
+
+                metrics = train_result.metrics
+                metrics["train_samples"] = len(train_dataset)
+
+                trainer.log_metrics("train", metrics)
+                trainer.save_metrics("train", metrics)
+                trainer.save_state()
+
+                output_train_file = os.path.join(training_args.output_dir, "train_results.txt")
+
+                with open(output_train_file, "w") as writer:
+                    logger.info("***** Train results *****")
+                    for key, value in sorted(train_result.metrics.items()):
+                        logger.info(f"  {key} = {value}")
+                        writer.write(f"{key} = {value}\n")
+
+                # State 저장
+                trainer.state.save_to_json(
+                    os.path.join(training_args.output_dir, "trainer_state.json")
+                )
+
+            # Evaluation
+            if training_args.do_eval:
+                logger.info("*** Evaluate ***")
+                metrics = trainer.evaluate()
+
+                metrics["eval_samples"] = len(eval_dataset)
+
+                trainer.log_metrics("eval", metrics)
+                trainer.save_metrics("eval", metrics)
+                           
+                    
+            
+                
 
 
 if __name__ == "__main__":
