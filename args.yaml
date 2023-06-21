@@ -1,41 +1,44 @@
 wandb:
     use: True
-    project: mrc_project
-    name: test # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
+    project: curriculum!!!
+    name: not curri/Linear/mix_hard/accumul 4 # 뒤에 model_name | batch_size | max_epoch | lr | warmup_steps | weight_decay가 자동으로 붙습니다. 비워두면 이것만 나옵니다
 
 model:
     model_name: klue/roberta-large
     saved_model_path: /opt/ml/models/train_dataset # inference 때 사용# inference 때 사용 및 korquad 1차 fine-tuning시 finetuning_dataset_roberta 사용
+    saved_curriculum_path: /opt/ml/models/curriculum # curriculum learning 시, 모델 저장 경로
     config_name: null
     tokenizer_name: null
-    retrieval_tokenizer: klue/roberta-large # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
+    retrieval_tokenizer: monologg/koelectra-base-v3-discriminator # sparse_embedding.bin 이나 bm25_sparse_embedding.bin 은 tokenizer에 따라 달라집니다. 바꿀 경우, 삭제 후 inference하셔야 합니다.
     do_finetuning: False # korquad 1차 finetuning시 True (default 및 2차 때는 False)
+    Custom_model: False # ReverseLSTM, Linear, Else(False)로 나뉨
 
 data:
     train_dataset_name: /opt/ml/input/data/train_dataset
     test_dataset_name: /opt/ml/input/data/test_dataset
     overwrite_cache: False
     preprocessing_num_workers: null
-    max_seq_length: 512
+    max_seq_length: 384
     pad_to_max_length: False
     doc_stride: 128
     max_answer_length: 30
     eval_retrieval: True
     num_clusters: 64
-    top_k_retrieval: 30
+    top_k_retrieval: 100
     use_faiss: False
     data_type: original # original, korquad, korquad_hard, mix, mix_hard (설명은 prepare_dataset.py에)
-    split: False # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
-    retrieval_type: es # tfidf, bm25, tfidf+bm25, tfidf+bm25_2, es (es는 bin 파일을 생성하지 않습니다.)
-    unuse_remove : False # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
+    split: True # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
+    retrieval_type: tfidf+bm25 # tfidf, bm25, tfidf+bm25, tfidf+bm25_2, es (es는 bin 파일을 생성하지 않습니다.)
+    unuse_remove : True # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
+    curriculum: True # Curriculum Learning 이용 시, True
 
 train:
     batch_size: 16
     max_epoch: 3
-    learning_rate: 5.0e-5
-    eval_step: 100
-    logging_step: 100
-    save_step: 100
+    learning_rate: 9.0e-6
+    eval_step: 50
+    logging_step: 50
+    save_step: 50
     gradient_accumulation: 1
     do_train: True
     do_eval: True # train에서 True, 제출용 inference에서는 False, eval inference는 True
@@ -46,4 +49,4 @@ train:
     weight_decay: 0.0
     seed: 42
     use_sep_token_in_inference: False
-    fix_embedding_layer: True # True 하면, 학습 시 embedding layer fix !
+    fix_embedding_layer: False # True 하면, 학습 시 embedding layer fix !
