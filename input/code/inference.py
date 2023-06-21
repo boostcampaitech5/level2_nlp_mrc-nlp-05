@@ -8,6 +8,7 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 import logging
 import sys
 import pandas as pd
+import torch
 
 from typing import Callable, Dict, List, Tuple
 
@@ -45,6 +46,7 @@ from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import konlpy.tag as konlpy
 import discord
+from custom import NewModelwithLinear, NewModelwithReverseLSTM
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +80,7 @@ def main(args):
     # wandb.init(project=args.wandb.project, name=args.wandb.name)
     
     training_args.do_train = True
-
+    model_args.model_name_or_path=model_args.saved_model_path
     print(f"model is from {model_args.saved_model_path}")
     print(f"data is from {data_args.test_dataset_name}")
 
@@ -107,12 +109,24 @@ def main(args):
         else model_args.saved_model_path,
         use_fast=True,
     )
+    
+    if model_args.Custom_model == "ReverseLSTM":
+        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
         
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.saved_model_path,
-        from_tf=bool(".ckpt" in model_args.saved_model_path),
-        config=config,
-    )
+        model = NewModelwithReverseLSTM(model_name=model_args.saved_model_path, config=config)
+        model.load_state_dict(checkpoint)
+        
+    elif model_args.Custom_model == "Linear" :
+        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
+        model = NewModelwithLinear(model_name=model_args.saved_model_path, config=config)
+        model.load_state_dict(checkpoint)
+        
+    else :
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
 
     doc_scores = None
     # True일 경우 : run passage retrieval
