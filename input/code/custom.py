@@ -16,9 +16,9 @@ class SequentialLSTM(torch.nn.Module):
         return output
     
 class NewModelwithReverseLSTM(torch.nn.Module) :
-    def __init__(self,model_name,config) :
+    def __init__(self,model_name,from_tf,config) :
         super().__init__()
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name,from_tf=from_tf,config=config)
         self.config = config
         self.additional_layer=torch.nn.Sequential(
                                               SequentialLSTM(hidden_size=config.hidden_size),
@@ -41,9 +41,9 @@ class NewModelwithReverseLSTM(torch.nn.Module) :
         return output_dic
     
 class NewModelwithLinear(torch.nn.Module) :
-    def __init__(self,model_name,config) :
+    def __init__(self,model_name,from_tf,config) :
         super().__init__()
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name,from_tf=from_tf,config=config)
         self.config = config
         self.additional_layer=torch.nn.Sequential(torch.nn.Linear(self.config.hidden_size, self.config.hidden_size),
                                               torch.nn.ReLU(),

@@ -23,11 +23,18 @@ if model_args.Custom_model == False:
 else :
     checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
     if model_args.Custom_model == "ReverseLSTM" :
-        model=NewModelwithReverseLSTM(model_name=model_args.model_name)
+        model=NewModelwithReverseLSTM(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
         
     elif model_args.Custom_model == "Linear" :
-        model=NewModelwithLinear(model_name=model_args.model_name)
-    
+        model=NewModelwithLinear(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
     model.load_state_dict(checkpoint)
 
 max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
@@ -153,6 +160,7 @@ metric = evaluate.load("squad")
 dataset = load_from_disk("/opt/ml/input/data/train_dataset")
 train_dataset=dataset['train']
 eval_dataset=dataset['validation']
+original=dataset['train']
 
 column_names = train_dataset.column_names
 
@@ -170,5 +178,9 @@ train_dataset = train_dataset.map(
         )
 
 # train_dataset = train_dataset.map(make_tensors)
-
+def check(input_ids, attention_mask, idx, model) :
+    output=model(input_ids=input_ids, attention_mask=attention_mask)
+    torch.softmax(output.start_logits,dim=1)
+    torch.softmax(output.end_logits, dim=1)
+    
 breakpoint()

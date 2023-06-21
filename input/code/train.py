@@ -102,9 +102,17 @@ def main(args):
         use_fast=True,
     )
     if model_args.Custom_model == 'ReverseLSTM':
-        model = NewModelwithReverseLSTM(model_args.model_name_or_path, config)
+        model = NewModelwithReverseLSTM(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
     elif model_args.Custom_model == 'Linear' :
-        model = NewModelwithLinear(model_args.model_name_or_path, config)
+        model = NewModelwithLinear(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+        )
     else :
         model = AutoModelForQuestionAnswering.from_pretrained(
             model_args.model_name_or_path,
