@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from datasets import Dataset, load_from_disk
 
-def scores_voting_ensemble(weights, path, number, test_df):
+def probs_voting_ensemble(weights, path, number, test_df):
     test_ids = test_df['id'].tolist()
     nbest_prediction = collections.OrderedDict()
     prediction = collections.OrderedDict()
@@ -28,17 +28,13 @@ def scores_voting_ensemble(weights, path, number, test_df):
     for i in range(len(test_ids)):
         id = test_ids[i]
         max_doc_num = None
-        max_logits = -200
+        max_probs = 0
         for j in range(number):
             pred = nbest_hubo[j][id][0]
-            score = (pred['start_logit']+pred['end_logit'])
-            if score < 0:
-                score = score*(1-weights[j])
-            else:
-                score = score*weights[j]
-            if max_logits <= score:
+            score = (pred["probability"])*weights[j]
+            if max_probs <= score:
                 max_doc_num = j
-                max_logits = score
+                max_probs = score
                 
         nbest_prediction[id] = nbest_hubo[max_doc_num][id]
         prediction[id] = best_hubo[max_doc_num][id]
@@ -73,5 +69,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    scores_voting_ensemble(args.scores_list, args.folder_path, args.file_number, test_df)
+    probs_voting_ensemble(args.scores_list, args.folder_path, args.file_number, test_df)
     
