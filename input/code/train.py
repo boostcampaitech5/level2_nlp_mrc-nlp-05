@@ -356,11 +356,7 @@ def run_mrc(
                 param.requires_grad = False 
                 
     # 토크나이저 학습용
-    if args.train.fix_else_layer:
-        for name, param in model.named_parameters():
-            if not 'embedding' in name:
-                param.requires_grad = False
-                
+    if args.train.tok_fine_tuning:
         f = open('/opt/ml/input/data/unique_word.txt', 'r')
         new_tokens = []
         while True:
