@@ -5,10 +5,19 @@ import pandas as pd
 from datasets import Dataset, load_from_disk
 
 def probs_voting_ensemble(weights, path, number, test_df):
+    """최고 probs 하나만을 고려하여 soft emsemble을 해주는 함수
+
+    Args:
+        weights (list): 각 predictions 별 가중치
+        path (str): prediction이 저장되어 있는 폴더 경로
+        number (int): ensemble 파일 개수
+        test_df (pd.DataFrame): test 데이터 DataFrame
+    """    
+    
     test_ids = test_df['id'].tolist()
     nbest_prediction = collections.OrderedDict()
     prediction = collections.OrderedDict()
-    weights = [weights[i]/sum(weights) for i in range(len(weights))]
+    weights = [weights[i] / sum(weights) for i in range(len(weights))]
     
     nbest_hubo = []
     best_hubo = []
@@ -29,9 +38,11 @@ def probs_voting_ensemble(weights, path, number, test_df):
         id = test_ids[i]
         max_doc_num = None
         max_probs = 0
+        
         for j in range(number):
             pred = nbest_hubo[j][id][0]
-            score = (pred["probability"])*weights[j]
+            score = (pred["probability"]) * weights[j]
+            
             if max_probs <= score:
                 max_doc_num = j
                 max_probs = score
