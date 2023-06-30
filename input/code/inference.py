@@ -213,10 +213,10 @@ def run_sparse_retrieval(
         )
     
     if data_args.split:
-        dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13')
+        #dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13')
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
-            df_list[i]['question'] = dataset2['validation']['question']
+            #df_list[i]['question'] = dataset2['validation']['question']
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
             dataset_list.append(dataset)
         return dataset_list, doc_scores
@@ -343,7 +343,7 @@ def run_mrc(
             elif training_args.do_eval:
                 references = [
                     {"id": ex["id"], "answers": ex[answer_column_name]}
-                    for ex in datasets["validation"]
+                    for ex in datasets[i]["validation"]
                 ]
 
                 return EvalPrediction(
@@ -399,7 +399,8 @@ def run_mrc(
             predict_path = f'{args.train.inference_output_dir}/predictions.json'
             with open(predict_path, 'r') as json_file:
                 prediction = json.load(json_file)
-            ground_truth = {item["id"]: item['answesrs']["text"] for item in eval_dataset[0]}
+            prediction = [{'prediction_text': value, 'id': key} for key, value in prediction.items()]
+            ground_truth = [{'answers': item['answers'], 'id': item['id']} for item in datasets[0]['validation']]
             print(metric.compute(predictions=prediction, references=ground_truth))
             
 

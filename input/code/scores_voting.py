@@ -26,13 +26,16 @@ def post_process_voting(doc_scores, path, topk, test_df):
         id = test_ids[i]
         max_doc_num = None
         max_logits = -200
+        
         for j in range(topk):
             pred = nbest_hubo[j][id][0]
             score = (pred['start_logit']+pred['end_logit'])
+            
             if score < 0:
                 score = score*(1-doc_scores[i][j])
             else:
                 score = score*doc_scores[i][j]
+                
             if max_logits <= score:
                 max_doc_num = j
                 max_logits = score
