@@ -111,14 +111,13 @@ def main(args):
     )
     
     if model_args.Custom_model == "ReverseLSTM":
-        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
-        
         model = NewModelwithReverseLSTM(model_name=model_args.saved_model_path, config=config)
+        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
         model.load_state_dict(checkpoint)
         
-    elif model_args.Custom_model == "Linear" :
-        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
+    elif model_args.Custom_model == "Linear":
         model = NewModelwithLinear(model_name=model_args.saved_model_path, config=config)
+        checkpoint = torch.load('/opt/ml/models/train_dataset/pytorch_model.bin')
         model.load_state_dict(checkpoint)
         
     else :

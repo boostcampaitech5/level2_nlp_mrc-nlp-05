@@ -412,30 +412,30 @@ def run_mrc(
             trainer.save_metrics("eval", metrics)
     else :
         # curriculum learning
-        for i in range(4) :
+        for i in range(4):
             
             print(f"***** Curriculum Learning에서 {i+1}번째다! *****")
-            csv_file=pd.read_csv(f"/opt/ml/input/data/curriculum_dataset/level{i}.csv")
-            train_dataset=Dataset.from_pandas(csv_file)
+            csv_file = pd.read_csv(f"/opt/ml/input/data/curriculum_dataset/level{i}.csv")
+            train_dataset = Dataset.from_pandas(csv_file)
             
             lst = []
-            for j in range(len(train_dataset['context'])) :
-                check=eval(train_dataset['answers'][j])
+            for j in range(len(train_dataset['context'])):
+                check = eval(train_dataset['answers'][j])
                 lst.append({'answer_start' : check['answer_start'], 'text' : check['text']})
 
-            train_dataset=train_dataset.remove_columns(['answers'])
-            train_dataset=train_dataset.add_column("answers",lst)
+            train_dataset = train_dataset.remove_columns(['answers'])
+            train_dataset = train_dataset.add_column("answers", lst)
             
-            def modifying(input) :
+            def modifying(input):
                 pattern = re.compile('\\\\n')
                 input['context'] = pattern.sub("  ", input['context'])
                 return input
             
-            if data_args.unuse_remove :
-                if training_args.do_train : # 학습 시
+            if data_args.unuse_remove:
+                if training_args.do_train: # 학습 시
                     train_dataset = train_dataset.map(modifying)
             
-            print(f"{i}번째 데이터의 크기는 .. ? {len(train_dataset['answers'])}")
+            print(f"{i}번째 데이터의 크기는 ? {len(train_dataset['answers'])}")
             train_dataset = train_dataset.map(
                 prepare_train_features,
                 batched=True,
@@ -443,7 +443,7 @@ def run_mrc(
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
                 )
-            print(f"변화가 생기는가? {len(train_dataset['input_ids'])}")
+
             # in Curriculum.py
             trainer = QuestionAnsweringTrainer(
                 model=model,
@@ -457,9 +457,6 @@ def run_mrc(
                 compute_metrics=compute_metrics,
                 #report_to='wandb'
             )
-            
-    
-            
     
             # Training
             if training_args.do_train:
