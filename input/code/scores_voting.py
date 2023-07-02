@@ -43,6 +43,7 @@ def post_process_voting(doc_scores, path, topk, test_df):
                 score = score * (1 - doc_scores[i][j])
             else:
                 score = score * doc_scores[i][j]
+
                 
             if max_logits <= score:
                 max_doc_num = j
