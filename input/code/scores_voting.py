@@ -3,6 +3,14 @@ import argparse
 import json
 
 def post_process_voting(doc_scores, path, topk, test_df):
+    """document에 대해 independent하게 inference한 prediction들 중 logits과 score를 고려하여 최종 prediction 생성
+
+    Args:
+        doc_scores (np.array): document별 retrieval score
+        path (str): inference output directory
+        topk (int): 몇 개의 문서를 retrieval할 지에 관한 topk
+        test_df (pd.DataFrame): test 데이터 DataFrame 
+    """    
     test_ids = test_df['id'].tolist()
     nbest_prediction = collections.OrderedDict()
     prediction = collections.OrderedDict()
@@ -26,13 +34,16 @@ def post_process_voting(doc_scores, path, topk, test_df):
         id = test_ids[i]
         max_doc_num = None
         max_logits = -200
+        
         for j in range(topk):
             pred = nbest_hubo[j][id][0]
-            score = (pred['start_logit']+pred['end_logit'])
+            score = (pred['start_logit'] + pred['end_logit'])
+            
             if score < 0:
-                score = score*(1-doc_scores[i][j])
+                score = score * (1 - doc_scores[i][j])
             else:
-                score = score*doc_scores[i][j]
+                score = score * doc_scores[i][j]
+                
             if max_logits <= score:
                 max_doc_num = j
                 max_logits = score
