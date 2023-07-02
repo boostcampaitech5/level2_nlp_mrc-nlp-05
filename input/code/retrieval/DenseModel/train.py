@@ -22,6 +22,11 @@ from rank_bm25 import BM25Okapi
 import pickle
 
 def set_seed(seed = 42):
+    """ 학습시 seed 고정을 위한 함수
+
+    Args:
+        seed (int, optional): 입력 seed. Defaults to 42.
+    """
     random.seed(seed)
     np.random.seed(seed)
 
@@ -33,6 +38,11 @@ def set_seed(seed = 42):
         torch.backends.cudnn.benchmark = False
 
 def load_data():
+    """ 학습할 데이터를 불러오는 함수
+
+    Returns:
+        list, list: 정답이 포함된 유사도가 높은 Topk의 Passage list와 정답 Passage의 위치 list
+    """
     data_path = "/opt/ml/input/data/topk_context.pkl"
     targets_path = "/opt/ml/input/data/targets.pkl"
 
@@ -97,6 +107,8 @@ def load_data():
     return topk_context, targets
 
 def train():
+    """ Dense Model 학습 함수
+    """
     set_seed()
 
     topk_contexts, targets = load_data()
@@ -213,6 +225,8 @@ def train():
     torch.save(Model.state_dict(), "/opt/ml/input/code/retrieval/Model.pt")
 
 def validation():
+    """ Dense Model 검증 함수
+    """
     dataset = load_from_disk("/opt/ml/input/data/train_dataset")
 
     with open(os.path.join("/opt/ml/input/data/wikipedia_documents.json"), "r", encoding="utf-8") as f:

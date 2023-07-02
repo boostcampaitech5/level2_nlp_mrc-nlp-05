@@ -21,12 +21,21 @@ def timer(name):
     print(f"[{name}] done in {time.time() - t0:.3f} s")
 
 class DenseRetrieval:
+    """ DenseRetrieval을 하기위한 Class
+    """
     def __init__(
         self,
         tokenize_fn,
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
     ) -> None:
+        """ DenseRetrieval 생성자
+
+        Args:
+            tokenize_fn (Tokenizer.tokenize): Query나 Passage를 Tokenize하기 위한 함수
+            data_path (Optional[str], optional): Data의 Path. Defaults to "../data/".
+            context_path (Optional[str], optional): Context의 Path. Defaults to "wikipedia_documents.json".
+        """
 
         self.data_path = data_path
         with open(os.path.join(data_path, context_path), "r", encoding="utf-8") as f:
@@ -50,6 +59,8 @@ class DenseRetrieval:
         self.indexer = None  # build_faiss()로 생성합니다.
 
     def get_sparse_embedding(self) -> None:
+        """ Context를 미리 Embedding 하기 위한 함수
+        """
         pickle_name = f"p_DenseEmbedding.bin"
 
         emd_path = os.path.join(self.data_path, pickle_name)
@@ -78,6 +89,15 @@ class DenseRetrieval:
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List, List], pd.DataFrame]:
+        """ Retrieval 동작 함수
+
+        Args:
+            query_or_dataset (Union[str, Dataset]): Query나 Queries 인자
+            topk (Optional[int], optional): Topk를 설정해주는 인자
+
+        Returns:
+            Union[Tuple[List, List], pd.DataFrame]: 유사도가 높은 Topk개의 Passage
+        """
 
         assert self.p_embedding is not None, "get_sparse_embedding() 메소드를 먼저 수행해줘야합니다."
 
@@ -121,15 +141,24 @@ class DenseRetrieval:
             return cqas
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
+        """ 단일 Query에 대해서 유사도가 높은 Topk개의 Passage를 찾는 함수
+
+        Args:
+            query (str): Query
+            k (Optional[int], optional): Topk의 값. Defaults to 1.
+
+        Returns:
+            Tuple[List, List]: 유사도가 높은 Topk개의 Passage
+        """
         with timer("transform"):
             query_emb = self.tokenizer([query], stride=128, truncation=True, padding="max_length", return_tensors='pt').to('cuda')
-            query_vec = self.Model(**query_emb).to('cpu').detach().numpy()
+            query_vec = self.Model.query(**query_emb).to('cpu').detach().numpy()
         assert (
             np.sum(query_vec) != 0
         ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
 
         with timer("query ex search"):
-            result = self.Model.get_score(query_vec, self.p_embedding)
+            result = self.Model.get_score(query_vec, self.p_embedding).numpy()
 
         sorted_result = np.argsort(result.squeeze())[::-1]
         doc_score = result.squeeze()[sorted_result].tolist()[:k]
@@ -139,19 +168,28 @@ class DenseRetrieval:
     def get_relevant_doc_bulk(
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
+        """ 다중 Query에 대해서 각각 유사도가 높은 Topk개의 Passage를 찾는 함수
+
+        Args:
+            query (str): Query
+            k (Optional[int], optional): Topk의 값. Defaults to 1.
+
+        Returns:
+            Tuple[List, List]: 각각의 Query에 대해서 유사도가 높은 Topk개의 Passage
+        """
 
         q_emb = list()
 
         for q in tqdm(queries):
             query_emb = self.tokenizer(q, stride=128, truncation=True, padding="max_length", return_tensors='pt').to('cuda')
-            q_emb.append(self.Model(**query_emb).to('cpu').detach().numpy())
+            q_emb.append(self.Model.query(**query_emb).to('cpu').detach().numpy())
         
         query_vec = np.array(q_emb).squeeze()
         assert (
             np.sum(query_vec) != 0
         ), "오류가 발생했습니다. 이 오류는 보통 query에 vectorizer의 vocab에 없는 단어만 존재하는 경우 발생합니다."
 
-        result = np.dot(query_vec, self.p_embedding)
+        result = self.Model.get_score(query_vec, self.p_embedding).numpy()
 
         doc_scores = []
         doc_indices = []
