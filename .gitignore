@@ -9,6 +9,7 @@
 !input/code/elasticsearch/*
 !input/code/retrieval/
 !input/code/retrieval/*
+!input/code/retrieval/DenseModel/*
 input/data/
 input/data/*
 !.bashrc
