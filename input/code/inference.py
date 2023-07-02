@@ -170,7 +170,10 @@ def run_sparse_retrieval(
         else :
             retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
 
-    retriever.get_sparse_embedding()
+    if data_args.retrieval_type =='es':
+        pass
+    else:
+        retriever.get_sparse_embedding()
     
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)

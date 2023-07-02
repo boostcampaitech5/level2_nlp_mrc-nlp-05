@@ -3,7 +3,7 @@ from tqdm import tqdm
 from elasticsearch import Elasticsearch
 
 
-class ES:
+class ElasticSearch:
     def __init__(self):
         self.INDEX_NAME = "wiki-sample"
         self.INDEX_SETTINGS = {
@@ -70,8 +70,9 @@ class ES:
         
         if self.es.indices.exists(self.INDEX_NAME):
             self.es.indices.delete(index=self.INDEX_NAME)
-            self.es.indices.create(index=self.INDEX_NAME, body=self.INDEX_SETTINGS)
-            self.es.indices.exists("wiki-sample")
+            
+        self.es.indices.create(index=self.INDEX_NAME, body=self.INDEX_SETTINGS)
+        self.es.indices.exists("wiki-sample")
         
         wiki_contexts = [self.preprocess(text) for text in contexts]
         wiki_articles = [{"document_text": wiki_contexts[i]} for i in range(len(wiki_contexts))]
