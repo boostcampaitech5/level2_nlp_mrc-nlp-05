@@ -31,6 +31,7 @@ from retrieval.retrieval_ES import ESSparseRetrieval
 from retrieval.retrieval_reranking import RerankSparseRetrieval
 from retrieval.retrieval_reranking2 import RerankSparseRetrieval2
 from scores_voting import post_process_voting
+from BSQuestionAnsweringModel import BSQuestionAnsweringModel
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
     AutoConfig,
@@ -41,12 +42,31 @@ from transformers import (
     TrainingArguments,
 )
 from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
+from find_answer_sentence import WikiInference
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import konlpy.tag as konlpy
+import copy
+import torch
 
 logger = logging.getLogger(__name__)
 
+class CustomDataCollator(DataCollatorWithPadding):
+    def __call__(self, features):
+        features_2 = copy.deepcopy(features)
+        for i in range(len(features_2)):
+            del features_2[i]['sentence_start']
+            del features_2[i]['sentence_end']
+            del features_2[i]['weights']
+   
+        batch = super().__call__(features_2)
+        
+        batch['sentence_start'] = [feature['sentence_start'] for feature in features]
+        batch['sentence_end'] = [feature['sentence_end'] for feature in features]
+        batch['weights'] = [feature['weights'] for feature in features]
+        
+        return batch
+    
 def main(args):
     # 가능한 arguments 들은 ./arguments.py 나 transformer package 안의 src/transformers/training_args.py 에서 확인 가능합니다.
     # --help flag 를 실행시켜서 확인할 수 도 있습니다.
@@ -107,11 +127,13 @@ def main(args):
         use_fast=True,
     )
         
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.saved_model_path,
-        from_tf=bool(".ckpt" in model_args.saved_model_path),
+    model = BSQuestionAnsweringModel(
+        model_args.model_name,
+        from_tf=bool(".ckpt" in model_args.model_name),
         config=config,
     )
+    state_dict = torch.load(f'{model_args.saved_model_path}/pytorch_model.bin')
+    model.load_state_dict(state_dict)
 
     doc_scores = None
     # True일 경우 : run passage retrieval
@@ -170,10 +192,7 @@ def run_sparse_retrieval(
         else :
             retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
 
-    if data_args.retrieval_type =='es':
-        pass
-    else:
-        retriever.get_sparse_embedding()
+    retriever.get_sparse_embedding()
     
     if data_args.use_faiss:
         retriever.build_faiss(num_clusters=data_args.num_clusters)
@@ -216,15 +235,18 @@ def run_sparse_retrieval(
         )
     
     if data_args.split:
-        #dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13')
+        dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13') ##
+        wikiinference = WikiInference("snunlp-KR-ELECTRA-discriminator-base.ckpt")
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
-            #df_list[i]['question'] = dataset2['validation']['question']
-            dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
+            print(f"{i}번째 document answer sentence inerence 중...")
+            df_list[i] = wikiinference.find_answer_sentence(df_list[i])
+            df_list[i]['question'] = dataset2['validation']['question'] ## 
+            dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i])})
             dataset_list.append(dataset)
         return dataset_list, doc_scores
     else:
-        datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
+        datasets = DatasetDict({"validation": Dataset.from_pandas(df)})
         return [datasets], None
 
 def run_mrc(
@@ -266,8 +288,7 @@ def run_mrc(
         # Validation preprocessing / 전처리를 진행합니다.
         def prepare_validation_features(examples):
             # truncation과 padding(length가 짧을때만)을 통해 toknization을 진행하며, stride를 이용하여 overflow를 유지합니다.
-            # 각 example들은 이전의 context와 조금씩 겹치게됩니다.
-                
+            # 각 example들은 이전의 context와 조금씩 겹치게됩니다.   
             tokenized_examples = tokenizer(
                 examples[question_column_name if pad_on_right else context_column_name],
                 examples[context_column_name if pad_on_right else question_column_name],
@@ -282,7 +303,61 @@ def run_mrc(
 
             # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
             sample_mapping = tokenized_examples.pop("overflow_to_sample_mapping")
+            
+            tokenized_examples["sentence_start"] = []
+            tokenized_examples["sentence_end"] = []
+            tokenized_examples["weights"] = []
+        
+            for i, offsets in enumerate(tokenized_examples["offset_mapping"]):
+                input_ids = tokenized_examples["input_ids"][i]
+                sentence_start = examples['sentence_start'][sample_mapping[i]]
+                sentence_end = examples['sentence_end'][sample_mapping[i]]
+                # sentence_start = examples['answer_sentence'][sample_mapping[i]]
+                # sentence_end = examples['answer_sentence'][sample_mapping[i]]
+                weights = examples['weights'][sample_mapping[i]]
 
+                sequence_ids = tokenized_examples.sequence_ids(i)
+
+                # text에서 current span의 Start token index
+                token_start_index = 0
+                while sequence_ids[token_start_index] != (1 if pad_on_right else 0):
+                    token_start_index += 1
+
+                # text에서 current span의 End token index
+                token_end_index = len(input_ids) - 1
+                while sequence_ids[token_end_index] != (1 if pad_on_right else 0):
+                    token_end_index -= 1
+                
+                if (sentence_start == []) and (sentence_end == []):
+                    tokenized_examples["sentence_start"].append([0])
+                    tokenized_examples["sentence_end"].append([0])
+                    tokenized_examples["weights"].append([1.0])
+                else:
+                    start_list, end_list, weight_list = [], [], []
+                    for k in range(len(sentence_start)):
+                        sentence_s, sentence_e = sentence_start[k], sentence_end[k]    
+                        start = token_start_index
+                        end = token_end_index
+                        for j in range(token_start_index, token_end_index+1):
+                            if (offsets[j][0] <= sentence_s) and (offsets[j][1] > sentence_s):
+                                start = j
+                            if (offsets[j][0] < sentence_e) and (offsets[j][1] >= sentence_e):
+                                end = j
+                                
+                        if (start == token_start_index) and (end == token_end_index):
+                            start, end = 0, 0
+                            weight = 1.0
+                        else:
+                            weight = weights[k]
+                        
+                        start_list.append(start)
+                        end_list.append(end)
+                        weight_list.append(weight)
+                           
+                    tokenized_examples["sentence_start"].append(start_list)
+                    tokenized_examples["sentence_end"].append(end_list)
+                    tokenized_examples["weights"].append(weight_list)
+                
             # evaluation을 위해, prediction을 context의 substring으로 변환해야합니다.
             # corresponding example_id를 유지하고 offset mappings을 저장해야합니다.
             tokenized_examples["example_id"] = []
@@ -317,7 +392,7 @@ def run_mrc(
         # Data collator
         # flag가 True이면 이미 max length로 padding된 상태입니다.
         # 그렇지 않다면 data collator에서 padding을 진행해야합니다.
-        data_collator = DataCollatorWithPadding(
+        data_collator = CustomDataCollator(
             tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None
         )
 

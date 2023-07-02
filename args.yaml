@@ -48,4 +48,4 @@ train:
   seed: 42
   use_sep_token_in_inference: False
   fix_embedding_layer: False # True 하면, 학습 시 embedding layer fix !
-  tok_fine_tuning: False # tokenizer 재학습 시킬 경우 True로 해주세요 한 번 학습하신 후 False로 바꾸고 다시 학습시키면 됩니다.
+  fix_else_layer: False # tokenizer 재학습 시킬 경우 True로 해주세요 한 번 학습하신 후 False로 바꾸고 다시 학습시키면 됩니다.

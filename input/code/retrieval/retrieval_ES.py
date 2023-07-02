@@ -95,6 +95,7 @@ class ESSparseRetrieval:
                         "context": self.contexts[doc_indices[idx][i]],
                     }
                     
+<<<<<<< HEAD
                     if "context" in example.keys() and "answers" in example.keys():
                         # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
                         tmp["original_context"] = example["context"]
@@ -104,6 +105,54 @@ class ESSparseRetrieval:
                     
                 cqas = pd.DataFrame(total)
                 cqas_lst.append(cqas)   
+=======
+                if split:
+                    doc_scores = np.array(doc_scores)
+                    doc_scores = doc_scores / np.max(doc_scores)
+                    cqas_lst = []
+                    for i in range(topk):
+                        total = []
+                        for idx, example in enumerate(
+                            tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                        ):
+                            tmp = {
+                                # Query와 해당 id를 반환합니다.
+                                "question": example["question"],
+                                "id": example["id"],
+                                # Retrieve한 Passage의 id, context를 반환합니다.
+                                "context": self.contexts[doc_indices[idx][i]],
+                            }
+                            if "context" in example.keys() and "answers" in example.keys():
+                                # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                                tmp["original_context"] = example["context"]
+                                tmp["answers"] = example["answers"]
+                            total.append(tmp)
+                        cqas = pd.DataFrame(total)
+                        cqas_lst.append(cqas)    
+                    return doc_scores, cqas_lst       
+                else:
+                    total = []
+                    for idx, example in enumerate(
+                        tqdm(query_or_dataset, desc="Sparse retrieval: ")
+                    ):
+                        tmp = {
+                            # Query와 해당 id를 반환합니다.
+                            "question": example["question"],
+                            "id": example["id"],
+                            # Retrieve한 Passage의 id, context를 반환합니다.
+                            "context": " ".join(
+                                [self.contexts[pid] for pid in doc_indices[idx]]
+                            ),
+                        }
+                        if "context" in example.keys() and "answers" in example.keys():
+                            # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
+                            tmp["original_context"] = example["context"]
+                            tmp["answers"] = example["answers"]
+                        total.append(tmp)
+
+                    cqas = pd.DataFrame(total)
+                    return cqas
+>>>>>>> 5f9874adee6901c04af3e344ecf69e0ecdfea034
             
             return doc_scores, cqas_lst       
         else:
