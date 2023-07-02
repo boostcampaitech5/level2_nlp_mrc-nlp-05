@@ -11,7 +11,6 @@ import sys
 
 
 def evaluation(gt_path: str, pred_path: str) -> str:
-
     """MRC metrics을 계산합니다.
 
     Arguments:
@@ -118,7 +117,6 @@ def f1_score(prediction: int, ground_truth: int) -> float:
 
 
 def exact_match_score(prediction: str, ground_truth: str) -> bool:
-
     return normalize_answer(prediction) == normalize_answer(ground_truth)
 
 

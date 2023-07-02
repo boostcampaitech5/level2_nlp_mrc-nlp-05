@@ -32,24 +32,24 @@ class BSQuestionAnsweringModel(BertPreTrainedModel):
         if weights == None:  
             weight = torch.ones_like(outputs['start_logits'])
             for i in range(outputs['start_logits'].size(0)):
-                weight[i, sentence_start[i]:sentence_end[i]+1] = 1.1
+                weight[i, sentence_start[i]:sentence_end[i] + 1] = 1.1
                 
             outputs['start_logits'] = outputs['start_logits'] * weight
             outputs['end_logits'] = outputs['end_logits'] * weight
+            
         else:
             weight = torch.ones_like(outputs['start_logits'])
             for i in range(outputs['start_logits'].size(0)):
                 for sentence_s, sentence_e, w in zip(sentence_start[i], sentence_end[i], weights[i]):
-                    weight[i, sentence_s:sentence_e+1] = 1 + 0.1*w
+                    weight[i, sentence_s:sentence_e+1] = 1 + 0.1 * w
             outputs['start_logits'] = outputs['start_logits'] * weight
             outputs['end_logits'] = outputs['end_logits'] * weight
                     
-        
         if (start_positions is not None) and (end_positions is not None):
             loss_fn = nn.CrossEntropyLoss()
             start_loss = loss_fn(outputs['start_logits'], start_positions)
             end_loss = loss_fn(outputs['end_logits'], end_positions)
-            total_loss = (start_loss + end_loss)/2
+            total_loss = (start_loss + end_loss) / 2
             outputs['loss'] = total_loss
             
         return outputs

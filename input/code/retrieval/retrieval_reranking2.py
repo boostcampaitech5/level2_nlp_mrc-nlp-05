@@ -5,6 +5,7 @@ import time
 from contextlib import contextmanager
 from typing import List, Optional, Tuple, Union
 
+import argparse
 import faiss
 import numpy as np
 import pandas as pd
@@ -12,6 +13,8 @@ from datasets import Dataset, concatenate_datasets, load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from rank_bm25 import BM25Okapi
 from tqdm.auto import tqdm
+
+from transformers import AutoTokenizer
 
 
 @contextmanager
@@ -28,9 +31,7 @@ class RerankSparseRetrieval2:
         data_path: Optional[str] = "../data/",
         context_path: Optional[str] = "wikipedia_documents.json",
     ) -> None:
-
-        """
-        Arguments:
+        """Arguments:
             tokenize_fn:
                 기본 text를 tokenize해주는 함수입니다.
                 아래와 같은 함수들을 사용할 수 있습니다.
@@ -58,6 +59,7 @@ class RerankSparseRetrieval2:
         self.contexts = list(
             dict.fromkeys([v["text"] for v in wiki.values()])
         )  # set 은 매번 순서가 바뀌므로
+        
         print(f"Lengths of unique contexts : {len(self.contexts)}")
         self.ids = list(range(len(self.contexts)))
 
@@ -68,9 +70,7 @@ class RerankSparseRetrieval2:
         self.indexer = None  # build_faiss()로 생성합니다.
 
     def get_sparse_embedding(self) -> None:
-
-        """
-        Summary:
+        """Summary:
             Passage Embedding을 만들고
             TFIDF와 Embedding을 pickle로 저장합니다.
             만약 미리 저장된 파일이 있으면 저장된 pickle을 불러옵니다.
@@ -93,6 +93,7 @@ class RerankSparseRetrieval2:
             with open(tfidfv_path, "rb") as file:
                 self.tfidfv = pickle.load(file)
             print("Embedding pickle load.")
+            
         else:
             print("Build passage embedding")
             
@@ -114,9 +115,7 @@ class RerankSparseRetrieval2:
             print("Embedding pickle saved.")
 
     def build_faiss(self, num_clusters=64) -> None:
-
-        """
-        Summary:
+        """Summary:
             속성으로 저장되어 있는 Passage Embedding을
             Faiss indexer에 fitting 시켜놓습니다.
             이렇게 저장된 indexer는 `get_relevant_doc`에서 유사도를 계산하는데 사용됩니다.
@@ -153,9 +152,7 @@ class RerankSparseRetrieval2:
     def retrieve(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
     ) -> Union[Tuple[List, List], pd.DataFrame]:
-
-        """
-        Arguments:
+        """Arguments:
             query_or_dataset (Union[str, Dataset]):
                 str이나 Dataset으로 이루어진 Query를 받습니다.
                 str 형태인 하나의 query만 받으면 `get_relevant_doc`을 통해 유사도를 구합니다.
@@ -187,7 +184,6 @@ class RerankSparseRetrieval2:
             return (doc_scores, [self.contexts[doc_indices[i]] for i in range(topk)])
 
         elif isinstance(query_or_dataset, Dataset):
-
             # Retrieve한 Passage를 pd.DataFrame으로 반환합니다.
             
             with timer("query exhaustive search"):
@@ -218,6 +214,7 @@ class RerankSparseRetrieval2:
                     cqas = pd.DataFrame(total)
                     cqas_lst.append(cqas)
                 return doc_scores, cqas_lst
+            
             else:
                 total = []    
                 for idx, example in enumerate(
@@ -242,9 +239,7 @@ class RerankSparseRetrieval2:
                 return cqas
 
     def get_relevant_doc(self, query: str, k: Optional[int] = 1) -> Tuple[List, List]:
-
-        """
-        Arguments:
+        """Arguments:
             query (str):
                 하나의 Query를 받습니다.
             k (Optional[int]): 1
@@ -252,6 +247,7 @@ class RerankSparseRetrieval2:
         Note:
             vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
         """
+        
         query_vec = self.tfidfv.transform(query)
         tokenized_query = [self.tokenizer(queryy) for queryy in list(query)]
         
@@ -281,9 +277,7 @@ class RerankSparseRetrieval2:
     def get_relevant_doc_bulk(
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
-
-        """
-        Arguments:
+        """Arguments:
             queries (List):
                 하나의 Query를 받습니다.
             k (Optional[int]): 1
@@ -291,6 +285,7 @@ class RerankSparseRetrieval2:
         Note:
             vocab 에 없는 이상한 단어로 query 하는 경우 assertion 발생 (예) 뙣뙇?
         """
+        
         tokenized_query = [self.tokenizer(query) for query in list(queries)]
         query_vec = self.tfidfv.transform(queries)
         assert (
@@ -320,9 +315,7 @@ class RerankSparseRetrieval2:
     def retrieve_faiss(
         self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1
     ) -> Union[Tuple[List, List], pd.DataFrame]:
-
-        """
-        Arguments:
+        """Arguments:
             query_or_dataset (Union[str, Dataset]):
                 str이나 Dataset으로 이루어진 Query를 받습니다.
                 str 형태인 하나의 query만 받으면 `get_relevant_doc`을 통해 유사도를 구합니다.
@@ -389,9 +382,7 @@ class RerankSparseRetrieval2:
     def get_relevant_doc_faiss(
         self, query: str, k: Optional[int] = 1
     ) -> Tuple[List, List]:
-
-        """
-        Arguments:
+        """Arguments:
             query (str):
                 하나의 Query를 받습니다.
             k (Optional[int]): 1
@@ -414,9 +405,7 @@ class RerankSparseRetrieval2:
     def get_relevant_doc_bulk_faiss(
         self, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
-
-        """
-        Arguments:
+        """Arguments:
             queries (List):
                 하나의 Query를 받습니다.
             k (Optional[int]): 1
@@ -435,11 +424,7 @@ class RerankSparseRetrieval2:
 
         return D.tolist(), I.tolist()
 
-
 if __name__ == "__main__":
-
-    import argparse
-
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "--dataset_name", default="/opt/ml/input/data/train_dataset", type=str, help=""
@@ -470,8 +455,6 @@ if __name__ == "__main__":
     #full_ds = org_dataset["validation"]
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
-
-    from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
 

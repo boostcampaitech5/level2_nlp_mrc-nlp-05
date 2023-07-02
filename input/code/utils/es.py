@@ -97,9 +97,3 @@ class ES:
         print(indices)
         
         return scores, indices
-    
-        # # top5 문서 id, score 출력
-        # for hit in res['hits']['hits']:
-        #     print("Doc ID: %3r  Score: %5.2f" % (hit['_id'], hit['_score']))
-        
-

@@ -149,7 +149,6 @@ def train():
     train_datasets = TensorDataset(tokenized_train_query_dataset['input_ids'], tokenized_train_query_dataset['attention_mask'], tokenized_train_query_dataset['token_type_ids'],
                                    tokenized_train_context_dataset, torch.Tensor(targets).type(torch.LongTensor))
 
-#    Model = BiEncoderModel.from_pretrained(MODEL_NAME)
     Model = ColBERTModel.from_pretrained(MODEL_NAME)
     Model.to("cuda")
 
@@ -178,8 +177,8 @@ def train():
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch")
     batch_loss = 0
 
-    for _ in train_iterator:
-        print(_)
+    for i in train_iterator:
+        print(i)
         epoch_iterator = tqdm(train_dataloader, desc="Iteration")
     
         for step, batch in enumerate(epoch_iterator):
@@ -238,7 +237,6 @@ def validation():
     MODEL_NAME = "klue/roberta-base"
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-#    Model = BiEncoderModel.from_pretrained(MODEL_NAME)
     Model = ColBERTModel.from_pretrained(MODEL_NAME)
     Model.load_state_dict(torch.load("/opt/ml/input/code/retrieval/Model.pt"))
     Model.to("cuda")

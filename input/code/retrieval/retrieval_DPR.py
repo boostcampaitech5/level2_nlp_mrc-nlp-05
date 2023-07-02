@@ -6,13 +6,14 @@ from contextlib import contextmanager
 from typing import List, Optional, Tuple, Union
 
 import torch
-import faiss
 import numpy as np
 import pandas as pd
 from datasets import Dataset, concatenate_datasets, load_from_disk
 from transformers import AutoTokenizer, AutoModel
 from tqdm.auto import tqdm
 from DenseModel.DenseModel import *
+
+from transformers import AutoTokenizer
 
 @contextmanager
 def timer(name):
@@ -50,7 +51,6 @@ class DenseRetrieval:
         MODEL_NAME = "klue/roberta-base"
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-    #    self.Model = BiEncoderModel.from_pretrained(MODEL_NAME)
         self.Model = ColBERTModel.from_pretrained(MODEL_NAME)
         self.Model.load_state_dict(torch.load("/opt/ml/input/code/retrieval/Model.pt"))
         self.Model.to("cuda")
@@ -224,17 +224,9 @@ if __name__ == "__main__":
     
     # Test sparse
     org_dataset = load_from_disk(args.dataset_name)
-    #full_ds = concatenate_datasets(
-    #    [
-    #        org_dataset["train"].flatten_indices(),
-    #        org_dataset["validation"].flatten_indices(),
-    #    ]
-    #)  # train dev 를 합친 4192 개 질문에 대해 모두 테스트
     full_ds = org_dataset["validation"]
     print("*" * 40, "query dataset", "*" * 40)
     print(full_ds)
-
-    from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False,)
 

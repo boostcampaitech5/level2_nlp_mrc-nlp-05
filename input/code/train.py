@@ -56,6 +56,7 @@ def main(args):
             args.wandb.name, model_args.model_name, training_args.per_device_train_batch_size, training_args.num_train_epochs, 
             training_args.learning_rate, training_args.warmup_steps, training_args.weight_decay))
         training_args.report_to = ["wandb"]
+        
     else:
         wandb.init(should_run=False)
 
@@ -74,16 +75,14 @@ def main(args):
 
     datasets = prepare_dataset(data_args.data_type, data_args.train_dataset_name, training_args.seed)
 
-    def modifying(input) :
+    def cleaning(input):
         pattern = re.compile('\\\\n')
         input['context'] = pattern.sub("  ", input['context'])
         return input
     
-    if data_args.unuse_remove :
-        if training_args.do_train : # 학습 시
-            datasets = datasets.map(modifying)
-    
-    '''wiki_pedia eval 시는 어떻게 바꿔야 할 지 몰라서 남겨 놓음!'''    
+    if data_args.unuse_remove:
+        if training_args.do_train: # 학습 시
+            datasets = datasets.map(cleaning)
 
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
@@ -92,6 +91,7 @@ def main(args):
         if model_args.config_name is not None
         else model_args.model_name_or_path,
     )
+    
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name
         if model_args.tokenizer_name is not None
@@ -101,6 +101,7 @@ def main(args):
         # rust version이 비교적 속도가 빠릅니다.
         use_fast=True,
     )
+    
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -112,7 +113,7 @@ def main(args):
         type(model_args),
         type(datasets),
         type(tokenizer),
-        type(model),
+        type(model)
     )
       
     if model_args.tok_train:
@@ -133,7 +134,7 @@ def tokenizer_train(tokenizer, datasets):
     print("======================================= TOK_TRAIN =======================================")
     new_tokenizer = tokenizer.train_new_from_iterator(batch_iterator(), vocab_size=32000)
     print("======================================= COMPLETE =======================================")
-    # datasets.unique() -> 불용어 제거 -> add_token
+    
     return new_tokenizer
     
 def run_mrc(
@@ -178,7 +179,7 @@ def run_mrc(
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             return_token_type_ids=False if 'roberta' in model_args.model_name_or_path else True, # roberta모델을 사용할 경우 False, bert를 사용할 경우 True로 표기해야합니다.
-            padding="max_length" if data_args.pad_to_max_length else False,
+            padding="max_length" if data_args.pad_to_max_length else False
         )
 
         # 길이가 긴 context가 등장할 경우 truncate를 진행해야하므로, 해당 데이터셋을 찾을 수 있도록 mapping 가능한 값이 필요합니다.
@@ -206,6 +207,7 @@ def run_mrc(
             if len(answers["answer_start"]) == 0:
                 tokenized_examples["start_positions"].append(cls_index)
                 tokenized_examples["end_positions"].append(cls_index)
+                
             else:
                 # text에서 정답의 Start/end character index
                 start_char = answers["answer_start"][0] # 정답은 항상 1개 인가?
@@ -228,6 +230,7 @@ def run_mrc(
                 ):
                     tokenized_examples["start_positions"].append(cls_index)
                     tokenized_examples["end_positions"].append(cls_index)
+                    
                 else:
                     # token_start_index 및 token_end_index를 answer의 끝으로 이동합니다.
                     # Note: answer가 마지막 단어인 경우 last offset을 따라갈 수 있습니다(edge case).
@@ -294,6 +297,7 @@ def run_mrc(
                 (o if sequence_ids[k] == context_index else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
+            
         return tokenized_examples
 
     if training_args.do_eval:
@@ -329,6 +333,7 @@ def run_mrc(
         formatted_predictions = [
             {"id": k, "prediction_text": v} for k, v in predictions.items()
         ]
+        
         if training_args.do_predict:
             return formatted_predictions
 
@@ -337,6 +342,7 @@ def run_mrc(
                 {"id": ex["id"], "answers": ex[answer_column_name]}
                 for ex in datasets["validation"]
             ]
+            
             return EvalPrediction(
                 predictions=formatted_predictions, label_ids=references
             )
@@ -350,22 +356,23 @@ def run_mrc(
         
         return {'eval_exact_match' : exact_match, 'eval_f1' : f1}
     
-    if args.train.fix_embedding_layer :
+    if args.train.fix_embedding_layer:
         for name, param in model.named_parameters():
-            if 'embedding' in name :
+            if 'embedding' in name:
                 param.requires_grad = False 
                 
     # 토크나이저 학습용
     if args.train.tok_fine_tuning:
         f = open('/opt/ml/input/data/unique_word.txt', 'r')
         new_tokens = []
+        
         while True:
             line = f.readline()
             line = line.replace('\n', '')
             line = line.replace('\t', '')
             new_tokens.append(line)
             
-            if not line: 
+            if not line:
                 break
 
         f.close()
@@ -397,7 +404,6 @@ def run_mrc(
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
     )
-
 
     # Training
     if training_args.do_train:
@@ -439,7 +445,6 @@ def run_mrc(
 
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")

@@ -4,7 +4,6 @@ Open-Domain Question Answering 을 수행하는 inference 코드 입니다.
 대부분의 로직은 train.py 와 비슷하나 retrieval, predict 부분이 추가되어 있습니다.
 """
 
-
 import logging
 import sys
 import pandas as pd
@@ -40,6 +39,7 @@ from transformers import (
     EvalPrediction,
     TrainingArguments,
 )
+
 from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
@@ -74,8 +74,6 @@ def main(args):
         metric_for_best_model='exact_match'
     )
     
-    # wandb.init(project=args.wandb.project, name=args.wandb.name)
-    
     training_args.do_train = True
 
     print(f"model is from {model_args.saved_model_path}")
@@ -93,6 +91,7 @@ def main(args):
 
     datasets = load_from_disk(data_args.test_dataset_name)
     test_df = pd.DataFrame(datasets['validation'])
+    
     # AutoConfig를 이용하여 pretrained model 과 tokenizer를 불러옵니다.
     # argument로 원하는 모델 이름을 설정하면 옵션을 바꿀 수 있습니다.
     config = AutoConfig.from_pretrained(
@@ -120,6 +119,7 @@ def main(args):
         if model_args.retrieval_tokenizer not in ['mecab', 'hannanum', 'kkma', 'komoran', 'okt']:
             retrieval_tokenizer = AutoTokenizer.from_pretrained(model_args.retrieval_tokenizer)
             tokenize_fn = retrieval_tokenizer.tokenize
+            
         else:
             if model_args.retrieval_tokenizer == 'mecab':
                 retrieval_tokenizer = konlpy.Mecab()
@@ -131,7 +131,9 @@ def main(args):
                 retrieval_tokenizer = konlpy.Komoran()
             else:
                 retrieval_tokenizer = konlpy.Okt()
+                
             tokenize_fn = retrieval_tokenizer.morphs
+            
         print('retrieval_tokenizer:', retrieval_tokenizer)
         
         datasets, doc_scores = run_sparse_retrieval(
@@ -155,7 +157,8 @@ def run_sparse_retrieval(
     if data_args.retrieval_type == 'es':
         retriever = ESSparseRetrieval
         retriever = retriever(data_path=data_path, context_path=context_path)
-    else :
+        
+    else:
         if data_args.retrieval_type == 'tfidf':
             retriever = TFIDFSparseRetrieval
         elif data_args.retrieval_type == 'bm25':
@@ -165,13 +168,14 @@ def run_sparse_retrieval(
         elif data_args.retrieval_type == 'tfidf+bm25_2':
             retriever = RerankSparseRetrieval2
         
-        if data_args.retrieval_type == 'bm25' :
+        if data_args.retrieval_type == 'bm25':
             retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path,args=OmegaConf.load(f'/opt/ml/args.yaml'))
-        else :
+        else:
             retriever = retriever(tokenize_fn=tokenize_fn, data_path=data_path, context_path=context_path)
 
     if data_args.retrieval_type =='es':
         pass
+    
     else:
         retriever.get_sparse_embedding()
     
@@ -180,6 +184,7 @@ def run_sparse_retrieval(
         df = retriever.retrieve_faiss(
             datasets["validation"], topk=data_args.top_k_retrieval
         )
+        
     else:
         if data_args.split:
             doc_scores, df_list = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, split=True)
@@ -188,18 +193,15 @@ def run_sparse_retrieval(
             
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
-        f = Features(
-            {
+        f = Features({
                 "context": Value(dtype="string", id=None),
                 "id": Value(dtype="string", id=None),
                 "question": Value(dtype="string", id=None),
-            }
-        )
+            })
 
     # train data 에 대해선 정답이 존재하므로 id question context answer 로 데이터셋이 구성됩니다.
     elif training_args.do_eval:
-        f = Features(
-            {
+        f = Features({
                 "answers": Sequence(
                     feature={
                         "text": Value(dtype="string", id=None),
@@ -212,19 +214,20 @@ def run_sparse_retrieval(
                 "original_context": Value(dtype="string", id=None),
                 "id": Value(dtype="string", id=None),
                 "question": Value(dtype="string", id=None),
-            }
-        )
+            })
     
     if data_args.split:
-        #dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13')
         dataset_list = []
+        
         for i in range(data_args.top_k_retrieval):
-            #df_list[i]['question'] = dataset2['validation']['question']
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i], features=f)})
             dataset_list.append(dataset)
+            
         return dataset_list, doc_scores
+    
     else:
         datasets = DatasetDict({"validation": Dataset.from_pandas(df, features=f)})
+        
         return [datasets], None
 
 def run_mrc(
@@ -240,6 +243,7 @@ def run_mrc(
 
     if data_args.split:
         run = data_args.top_k_retrieval
+        
     else:
         run = 1
     
@@ -402,6 +406,7 @@ def run_mrc(
             predict_path = f'{args.train.inference_output_dir}/predictions.json'
             with open(predict_path, 'r') as json_file:
                 prediction = json.load(json_file)
+                
             prediction = [{'prediction_text': value, 'id': key} for key, value in prediction.items()]
             ground_truth = [{'answers': item['answers'], 'id': item['id']} for item in datasets[0]['validation']]
             print(metric.compute(predictions=prediction, references=ground_truth))

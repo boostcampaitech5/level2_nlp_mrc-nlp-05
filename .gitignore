@@ -9,8 +9,8 @@
 !input/code/elasticsearch/*
 !input/code/retrieval/
 !input/code/retrieval/*
-!input/code/ensemble_code/
-!input/code/ensemble_code/*
+!input/code/ensemble/
+!input/code/ensemble/*
 !input/code/retrieval/DenseModel/
 !input/code/retrieval/DenseModel/*
 input/data/

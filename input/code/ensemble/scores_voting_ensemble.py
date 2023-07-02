@@ -2,18 +2,17 @@ import collections
 import argparse
 import json
 import pandas as pd
-from datasets import Dataset, load_from_disk
+from datasets import load_from_disk
 
-def probs_voting_ensemble(weights, path, number, test_df):
-    """최고 probs 하나만을 고려하여 soft emsemble을 해주는 함수
+def scores_voting_ensemble(weights, path, number, test_df):
+    """최고 logits 하나만을 고려하여 soft emsemble을 해주는 함수
 
     Args:
         weights (list): 각 predictions 별 가중치
         path (str): prediction이 저장되어 있는 폴더 경로
         number (int): ensemble 파일 개수
         test_df (pd.DataFrame): test 데이터 DataFrame
-    """    
-    
+    """      
     test_ids = test_df['id'].tolist()
     nbest_prediction = collections.OrderedDict()
     prediction = collections.OrderedDict()
@@ -37,15 +36,20 @@ def probs_voting_ensemble(weights, path, number, test_df):
     for i in range(len(test_ids)):
         id = test_ids[i]
         max_doc_num = None
-        max_probs = 0
+        max_logits = -200
         
         for j in range(number):
             pred = nbest_hubo[j][id][0]
-            score = (pred["probability"]) * weights[j]
+            score = (pred['start_logit'] + pred['end_logit'])
             
-            if max_probs <= score:
+            if score < 0:
+                score = score * (1-weights[j])
+            else:
+                score = score * weights[j]
+                
+            if max_logits <= score:
                 max_doc_num = j
-                max_probs = score
+                max_logits = score
                 
         nbest_prediction[id] = nbest_hubo[max_doc_num][id]
         prediction[id] = best_hubo[max_doc_num][id]
@@ -80,5 +84,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    probs_voting_ensemble(args.scores_list, args.folder_path, args.file_number, test_df)
+    scores_voting_ensemble(args.scores_list, args.folder_path, args.file_number, test_df)
     

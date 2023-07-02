@@ -10,12 +10,12 @@ from trainer_qa import QuestionAnsweringTrainer
 from BSQuestionAnsweringModel import BSQuestionAnsweringModel
 from transformers import (
     AutoConfig,
-    AutoModelForQuestionAnswering,
     AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
-    TrainingArguments,
+    TrainingArguments
 )
+
 from utils_qa import set_seed, check_no_error, postprocess_qa_predictions
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
@@ -53,8 +53,10 @@ def main(args):
     if args.wandb.use:
         wandb.init(project=args.wandb.project, name=wandb_naming(
             args.wandb.name, model_args.model_name, training_args.per_device_train_batch_size, training_args.num_train_epochs, 
-            training_args.learning_rate, training_args.warmup_steps, training_args.weight_decay))
+            training_args.learning_rate, training_args.warmup_steps, training_args.weight_decay
+            ))
         training_args.report_to = ["wandb"]
+        
     else:
         wandb.init(should_run=False)
 
@@ -314,6 +316,7 @@ def run_mrc(
             for j in range(token_start_index, token_end_index+1):
                 if (offsets[j][0] <= sentence_start) and (offsets[j][1] > sentence_start):
                     start = j
+                    
                 if (offsets[j][0] < sentence_end) and (offsets[j][1] >= sentence_end):
                     end = j
             
@@ -346,13 +349,6 @@ def run_mrc(
 
     if training_args.do_eval:
         eval_dataset = datasets["validation"]
-        
-        #def preprocess_function(example):
-        #    example['context'] = example['title'] + ' : ' + example['context']
-        #    example['answers']['answer_start'][0] = example['answers']['answer_start'][0] + len(example['title'] + ' : ')
-        #    return example
-#
-        #valid_datasets = eval_dataset.map(preprocess_function)
 
         # Validation Feature 생성
         eval_dataset = eval_dataset.map(
@@ -380,6 +376,7 @@ def run_mrc(
             max_answer_length=data_args.max_answer_length,
             output_dir=training_args.output_dir,
         )
+        
         # Metric을 구할 수 있도록 Format을 맞춰줍니다.
         formatted_predictions = [
             {"id": k, "prediction_text": v} for k, v in predictions.items()
@@ -417,7 +414,6 @@ def run_mrc(
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
     )
-
 
     # Training
     if training_args.do_train:

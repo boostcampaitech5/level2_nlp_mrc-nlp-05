@@ -2,11 +2,8 @@ import pandas as pd
 
 import transformers
 import torch
-import torch
-import torchmetrics
 import pytorch_lightning as pl
 from sklearn.metrics import f1_score, accuracy_score
-from torch.utils.data import DataLoader
 
 class Model(pl.LightningModule):
     def __init__(self, model_name, lr):
@@ -95,6 +92,7 @@ class Dataset(torch.utils.data.Dataset):
                 # "token_type_ids": self.inputs[idx]["token_type_ids"],
                 "attention_mask": self.inputs["attention_mask"][idx],
             }
+            
         else:
             return {
                 "input_ids": self.inputs["input_ids"][idx],
@@ -141,7 +139,7 @@ class WikiInference():
         contexts = []
         len_list = []
         
-        for idx, row in df.iterrows():
+        for _, row in df.iterrows():
             question = row['question']
             context = row['context'].split('.')
             for i in range(len(context)-1):
@@ -166,20 +164,21 @@ class WikiInference():
         outputs = torch.softmax(outputs, dim=1).cpu().tolist()
              
         index = 0
+        
         for i in range(len(len_list)):
-            len_ = len_list[i]
+            length = len_list[i]
             sentence_start, sentence_end = [], []
             weights = []
             total = 0
-            for j in range(len_):
+            
+            for j in range(length):
                 if preds[index+j] == 1:
                     sentence_start.append(total)
                     sentence_end.append(total+len(contexts[index+j]))
                     weights.append(outputs[index+j][1])
                 total += len(contexts[index+j])
-            index += len_
+            index += length
             new_row = {'context': df.loc[i, 'context'], 'id': df.loc[i, 'id'], 'question' : df.loc[i, 'question'], 'sentence_start': sentence_start, 'sentence_end': sentence_end, 'weights': weights}
             new_df = new_df.append(new_row, ignore_index=True)
             
         return new_df
-            

@@ -3,7 +3,7 @@ import os
 import time
 from contextlib import contextmanager
 from typing import List, Optional, Tuple, Union
-from utils.elasticSearch import *
+from input.code.utils.elastic_search import *
 import numpy as np
 import pandas as pd
 from datasets import Dataset
@@ -40,14 +40,13 @@ class ESSparseRetrieval:
     def retrieve(
             self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
         ) -> Union[Tuple[List, List], pd.DataFrame]:
-
-        """
-        Arguments:
+        """Arguments:
             query_or_dataset (Union[str, Dataset]):
                 Dataset으로 이루어진 Query를 받습니다.
             topk (Optional[int], optional): Defaults to 1.
                 상위 몇 개의 passage를 사용할 것인지 지정합니다
         """ 
+        
         pickle_name = f"es_embedding.bin"
         es_bm25_name = f"es_bm25.bin"
         emd_path = os.path.join(self.data_path, pickle_name)
@@ -95,17 +94,6 @@ class ESSparseRetrieval:
                         "context": self.contexts[doc_indices[idx][i]],
                     }
                     
-<<<<<<< HEAD
-                    if "context" in example.keys() and "answers" in example.keys():
-                        # validation 데이터를 사용하면 ground_truth context와 answer도 반환합니다.
-                        tmp["original_context"] = example["context"]
-                        tmp["answers"] = example["answers"]
-                        
-                    total.append(tmp)
-                    
-                cqas = pd.DataFrame(total)
-                cqas_lst.append(cqas)   
-=======
                 if split:
                     doc_scores = np.array(doc_scores)
                     doc_scores = doc_scores / np.max(doc_scores)
@@ -128,8 +116,10 @@ class ESSparseRetrieval:
                                 tmp["answers"] = example["answers"]
                             total.append(tmp)
                         cqas = pd.DataFrame(total)
-                        cqas_lst.append(cqas)    
-                    return doc_scores, cqas_lst       
+                        cqas_lst.append(cqas)
+                        
+                    return doc_scores, cqas_lst 
+                
                 else:
                     total = []
                     for idx, example in enumerate(
@@ -151,10 +141,11 @@ class ESSparseRetrieval:
                         total.append(tmp)
 
                     cqas = pd.DataFrame(total)
+                    
                     return cqas
->>>>>>> 5f9874adee6901c04af3e344ecf69e0ecdfea034
             
             return doc_scores, cqas_lst       
+        
         else:
             total = []
             
@@ -181,13 +172,10 @@ class ESSparseRetrieval:
             cqas = pd.DataFrame(total)
             return cqas
 
-
     def get_relevant_doc_bulk(
         self, ES, queries: List, k: Optional[int] = 1
     ) -> Tuple[List, List]:
-        
-        """
-        Arguments:
+        """Arguments:
             queries (List):
                 하나의 Query를 받습니다.
             k (Optional[int]): 1
