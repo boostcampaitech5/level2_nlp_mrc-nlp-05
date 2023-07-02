@@ -1,26 +1,29 @@
 import collections
 import argparse
 import json
+import pandas as pd
+from datasets import Dataset, load_from_disk
 
-def post_process_voting(doc_scores, path, topk, test_df):
-    """document에 대해 independent하게 inference한 prediction들 중 logits과 score를 고려하여 최종 prediction 생성
+def scores_voting_ensemble(weights, path, number, test_df):
+    """최고 logits 하나만을 고려하여 soft emsemble을 해주는 함수
 
     Args:
-        doc_scores (np.array): document별 retrieval score
-        path (str): inference output directory
-        topk (int): 몇 개의 문서를 retrieval할 지에 관한 topk
-        test_df (pd.DataFrame): test 데이터 DataFrame 
-    """    
+        weights (list): 각 predictions 별 가중치
+        path (str): prediction이 저장되어 있는 폴더 경로
+        number (int): ensemble 파일 개수
+        test_df (pd.DataFrame): test 데이터 DataFrame
+    """      
     test_ids = test_df['id'].tolist()
     nbest_prediction = collections.OrderedDict()
     prediction = collections.OrderedDict()
+    weights = [weights[i] / sum(weights) for i in range(len(weights))]
     
     nbest_hubo = []
     best_hubo = []
     
-    for i in range(topk):
-        nbest_path = f'{path}/split_prediction/{i}_pred/nbest_predictions.json'
-        best_path = f'{path}/split_prediction/{i}_pred/predictions.json'
+    for i in range(number):
+        nbest_path = f'{path}/nbest_predictions_{i}.json'
+        best_path = f'{path}/predictions_{i}.json'
         
         with open(nbest_path, 'r') as json_file:
             json_data = json.load(json_file)
@@ -35,15 +38,14 @@ def post_process_voting(doc_scores, path, topk, test_df):
         max_doc_num = None
         max_logits = -200
         
-        for j in range(topk):
+        for j in range(number):
             pred = nbest_hubo[j][id][0]
             score = (pred['start_logit'] + pred['end_logit'])
             
             if score < 0:
-                score = score * (1 - doc_scores[i][j])
+                score = score * (1-weights[j])
             else:
-                score = score * doc_scores[i][j]
-
+                score = score * weights[j]
                 
             if max_logits <= score:
                 max_doc_num = j
@@ -63,3 +65,24 @@ def post_process_voting(doc_scores, path, topk, test_df):
         writer.write(
             json.dumps(prediction, indent=4, ensure_ascii=False) + "\n"
         )
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="")
+    
+    parser.add_argument(
+        "--scores_list", nargs='+', type=float, help="list of float"
+    )
+    parser.add_argument(
+        "--folder_path", default=f"/opt/ml/ensemble", type=str, help="folder path"
+    )
+    parser.add_argument(
+        "--file_number", type=int, help="ensemble file number"
+    )
+    
+    test_dataset = load_from_disk("/opt/ml/input/data/test_dataset")
+    test_df = pd.DataFrame(test_dataset['validation'])
+    
+    args = parser.parse_args()
+    
+    scores_voting_ensemble(args.scores_list, args.folder_path, args.file_number, test_df)
+    
