@@ -26,8 +26,8 @@ data:
   top_k_retrieval: 40
   use_faiss: False
   data_type: original # original, korquad, korquad_hard, mix, mix_hard (설명은 prepare_dataset.py에)
-  split: True # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
-  retrieval_type: es # tfidf, bm25, tfidf+bm25, tfidf+bm25_2, es (es는 bin 파일을 생성하지 않습니다.)
+  independent: True # 문서를 concat하지 않고 각각에 대해 inference를 하고 싶으시면 True
+  retrieval_type: reranking # tfidf, bm25, reranking, reranking2, es (es는 bin 파일을 생성하지 않습니다.)
   unuse_remove: False # True 하면 \\n을 지워주고 학습, False 하면 원래대로 학습
 
 train:

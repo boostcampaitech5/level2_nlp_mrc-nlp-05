@@ -181,9 +181,9 @@ def run_sparse_retrieval(
             retriever = TFIDFSparseRetrieval
         elif data_args.retrieval_type == 'bm25':
             retriever = BM25SparseRetrieval
-        elif data_args.retrieval_type == 'tfidf+bm25':
+        elif data_args.retrieval_type == 'reranking':
             retriever = RerankSparseRetrieval
-        elif data_args.retrieval_type == 'tfidf+bm25_2':
+        elif data_args.retrieval_type == 'reranking2':
             retriever = RerankSparseRetrieval2
         
         if data_args.retrieval_type == 'bm25':
@@ -198,19 +198,17 @@ def run_sparse_retrieval(
         df = retriever.retrieve_faiss(datasets["validation"], topk=data_args.top_k_retrieval)
         
     else:
-        if data_args.split:
-            doc_scores, df_list = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, split=True)
+        if data_args.independent:
+            doc_scores, df_list = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, independent=True)
         else:
-            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, split=False)
+            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, independent=False)
     
     if data_args.split:
-        dataset2 = load_from_disk('/opt/ml/input/data/test_dataset13') ##
         wikiinference = WikiInference("snunlp-KR-ELECTRA-discriminator-base.ckpt")
         dataset_list = []
         for i in range(data_args.top_k_retrieval):
             print(f"{i}번째 document answer sentence inerence 중...")
             df_list[i] = wikiinference.find_answer_sentence(df_list[i])
-            df_list[i]['question'] = dataset2['validation']['question'] ## 
             dataset = DatasetDict({"validation": Dataset.from_pandas(df_list[i])})
             dataset_list.append(dataset)
         return dataset_list, doc_scores
@@ -229,7 +227,7 @@ def run_mrc(
     doc_scores=None,
 ) -> None:
 
-    if data_args.split:
+    if data_args.independent:
         run = data_args.top_k_retrieval
     else:
         run = 1

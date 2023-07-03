@@ -128,7 +128,7 @@ class BM25SparseRetrieval:
             print("Faiss Indexer Saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, independent=False,
     ) -> Union[Tuple[List, List], pd.DataFrame]:
         """Arguments:
             query_or_dataset (Union[str, Dataset]):
@@ -169,7 +169,7 @@ class BM25SparseRetrieval:
                     query_or_dataset["question"], k=topk
                 )
                 
-            if split:
+            if independent:
                 doc_scores = doc_scores.toarray()
                 doc_scores = doc_scores / np.max(doc_scores)
                 cqas_lst = []

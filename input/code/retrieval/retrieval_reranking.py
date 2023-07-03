@@ -148,7 +148,7 @@ class RerankSparseRetrieval:
             print("Faiss Indexer Saved.")
 
     def retrieve(
-        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
+        self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, independent=False,
     ) -> Union[Tuple[List, List], pd.DataFrame]:
         """Arguments:
             query_or_dataset (Union[str, Dataset]):
@@ -248,7 +248,7 @@ class RerankSparseRetrieval:
                 doc_scores.append(doc_score[sorted_indices][:topk])
                 doc_indices.append(doc_indice[sorted_indices][:topk])  
             
-            if split:
+            if independent:
                 cqas_lst = [] 
                 for i in range(topk):
                     total = []

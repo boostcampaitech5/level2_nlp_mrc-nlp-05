@@ -3,7 +3,7 @@ import os
 import time
 from contextlib import contextmanager
 from typing import List, Optional, Tuple, Union
-from input.code.utils.elastic_search import *
+from utils.elastic_search import *
 import numpy as np
 import pandas as pd
 from datasets import Dataset
@@ -38,7 +38,7 @@ class ESSparseRetrieval:
 
 
     def retrieve(
-            self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, split=False,
+            self, query_or_dataset: Union[str, Dataset], topk: Optional[int] = 1, independent=False,
         ) -> Union[Tuple[List, List], pd.DataFrame]:
         """Arguments:
             query_or_dataset (Union[str, Dataset]):
@@ -75,7 +75,7 @@ class ESSparseRetrieval:
 
         total = []
                         
-        if split:
+        if independent:
             doc_scores = np.array(doc_scores)
             doc_scores = doc_scores / np.max(doc_scores)
             cqas_lst = []
@@ -94,7 +94,7 @@ class ESSparseRetrieval:
                         "context": self.contexts[doc_indices[idx][i]],
                     }
                     
-                if split:
+                if independent:
                     doc_scores = np.array(doc_scores)
                     doc_scores = doc_scores / np.max(doc_scores)
                     cqas_lst = []

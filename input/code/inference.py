@@ -163,9 +163,9 @@ def run_sparse_retrieval(
             retriever = TFIDFSparseRetrieval
         elif data_args.retrieval_type == 'bm25':
             retriever = BM25SparseRetrieval
-        elif data_args.retrieval_type == 'tfidf+bm25':
+        elif data_args.retrieval_type == 'reranking':
             retriever = RerankSparseRetrieval
-        elif data_args.retrieval_type == 'tfidf+bm25_2':
+        elif data_args.retrieval_type == 'reranking2':
             retriever = RerankSparseRetrieval2
         
         if data_args.retrieval_type == 'bm25':
@@ -186,10 +186,10 @@ def run_sparse_retrieval(
         )
         
     else:
-        if data_args.split:
-            doc_scores, df_list = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, split=True)
+        if data_args.independent:
+            doc_scores, df_list = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, independent=True)
         else:
-            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, split=False)
+            df = retriever.retrieve(datasets["validation"], topk=data_args.top_k_retrieval, independent=False)
             
     # test data 에 대해선 정답이 없으므로 id question context 로만 데이터셋이 구성됩니다.
     if training_args.do_predict:
@@ -216,7 +216,7 @@ def run_sparse_retrieval(
                 "question": Value(dtype="string", id=None),
             })
     
-    if data_args.split:
+    if data_args.independent:
         dataset_list = []
         
         for i in range(data_args.top_k_retrieval):
@@ -241,7 +241,7 @@ def run_mrc(
     doc_scores=None,
 ) -> None:
 
-    if data_args.split:
+    if data_args.independent:
         run = data_args.top_k_retrieval
         
     else:
@@ -365,7 +365,7 @@ def run_mrc(
         print("init trainer...")
         # Trainer 초기화
         
-        if data_args.split:
+        if data_args.independent:
             training_args.output_dir = f'{args.train.inference_output_dir}/split_prediction/{i}_pred'
             
         trainer = QuestionAnsweringTrainer(
@@ -399,7 +399,7 @@ def run_mrc(
             trainer.log_metrics("test", metrics)
             trainer.save_metrics("test", metrics)
         
-    if data_args.split:
+    if data_args.independent:
         post_process_voting(doc_scores, args.train.inference_output_dir, data_args.top_k_retrieval, test_df)
         
         if not args.train.do_predict:
