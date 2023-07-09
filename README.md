@@ -1,4 +1,6 @@
-# level2_MRC_nlp-05
+# level2_MRC-nlp-05
+
+<br>
 
 ## 🐴Members
 
@@ -6,21 +8,32 @@
 | --- | --- | --- | --- | --- |
 | [변성훈](https://github.com/DNA-B) | [서보성](https://github.com/Seoboseong) | [이상민](https://github.com/SangMini2) | [이승우](https://github.com/OLAOOT) | [이예원](https://github.com/aeongaewon) |
 
+<br>
+
 ## 📎ODQA (Open-Domain Question Answering)
 
 > 부스트캠프 AI-Tech 5기 NLP 트랙 Level2 3차 경진대회 프로젝트입니다. Question Answering 은 다양한 종류의 질문에 대해 대답하는 인공지능을 만드는 연구 분야입니다. 특히 ***Open-Domain Question Answering (ODQA)*** 은 주어지는 지문이 따로 존재하지 않고 사전에 구축된 Knowledge resource에서 질문에 답할 수 있는 문서를 찾는 과정이 추가됩니다. 본 대회에서 우리가 만들어야 했던 모델은 질문에 관련된 문서를 찾아주는 ***retriever*** - 관련된 문서를 읽고 적절한 답변을 찾거나 만들어주는 ***reader***의 two-stage로 구성되어 있습니다.
 > 
 
-### Data (Private)
+<br>
 
-![data](https://github.com/boostcampaitech5/level2_nlp_mrc-nlp-05/assets/60664644/f3f5f7fc-97b0-41d2-b5d2-22b064673609)
+### Data
 
-![data_example](https://github.com/boostcampaitech5/level2_nlp_mrc-nlp-05/assets/60664644/22debc45-cf75-44ef-9c17-0611d7d459cf)
+- 데이터 구성  
+![image](https://github.com/DNA-B/Open-Domain-Question-Answering/assets/102334596/f1a23caf-a8d5-43fe-8eb5-94c53051b4b9)
+
+<br>
+
+- 데이터 예시  
+![image](https://github.com/DNA-B/Open-Domain-Question-Answering/assets/102334596/7309b366-c047-4ad6-bdc1-8b8c7d38d189)
+  
+<br>
 
 ### Metric
-
 - Exact Match (EM), F1 Score (보조)
-  
+
+<br><br>
+
 ## ✔️Project
 
 ### Structure
@@ -71,6 +84,8 @@ root/input/code/
 - Preprocessing
 - Prompt Tuning
 
+<br>
+
 ### Retriever
 
 - Retriever Tokenizer
@@ -87,21 +102,29 @@ root/input/code/
     - [SEP] special token
     - Independent Documents Inference
 
-### Reader
+<br>
 
+### Reader
 - Model, Tokenizer Tuning
 - Curriculum Learning
 - Transfer Learning
 - Negative Sampling
 
+<br>
+
 ### Sentence-level Approach (Bremen Special)
 
-### Ensemble
+<br>
 
+### Ensemble
 - nbest-probs soft voting
+  
+<br>
 
 
 💡 __*위에 관한 자세한 내용은 [Wrap-up Report](https://github.com/boostcampaitech5/level2_nlp_mrc-nlp-05/blob/dev/mrc_NLP_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(05).pdf)를 참고해주세요.*__
+
+<br>
 
 ## 🐞Usage
 
@@ -113,13 +136,12 @@ python3 input/code/train.py
 python3 input/code/inference.py
 ```
 
+<br>
+
 ## 🏆Result
 
 - Public 3위
-
-![public](https://github.com/boostcampaitech5/level2_nlp_mrc-nlp-05/assets/60664644/440542d9-bf3c-4594-9d29-952cb6e2c545)
-
+![image](https://github.com/DNA-B/Open-Domain-Question-Answering/assets/102334596/ec20af96-a502-4357-b14f-72957bf9ffd9)
 
 - Private 2위
-
-![private](https://github.com/boostcampaitech5/level2_nlp_mrc-nlp-05/assets/60664644/9c42b0db-7501-41b0-b222-23b61033fe6a)
+![image](https://github.com/DNA-B/Open-Domain-Question-Answering/assets/102334596/fcb03111-13c5-4ad6-b61c-a4307c736e1d)
